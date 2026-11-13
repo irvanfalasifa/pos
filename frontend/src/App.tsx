@@ -1,13 +1,50 @@
-import { Coffee } from 'lucide-react'
+import { useEffect } from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { useAuthStore } from './stores/authStore'
+import LoginPage from './pages/LoginPage'
+import WorkspacePage from './pages/WorkspacePage'
+import ProtectedRoute from './components/ProtectedRoute'
 
 export default function App() {
+  const fetchMe = useAuthStore((s) => s.fetchMe)
+
+  useEffect(() => {
+    fetchMe()
+  }, [fetchMe])
+
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-      <div className="bg-white rounded-2xl shadow-lg p-8 text-center transition hover:shadow-xl">
-        <Coffee className="mx-auto h-12 w-12 text-amber-600" />
-        <h1 className="mt-4 text-2xl font-bold text-slate-800">POS Restoran</h1>
-        <p className="mt-1 text-slate-500">Frontend berhasil berjalan 🎉</p>
-      </div>
-    </div>
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+
+      <Route element={<ProtectedRoute allowedRoles={['admin', 'inventory']} />}>
+        <Route
+          path="/manajemen"
+          element={<WorkspacePage title="Dashboard Manajemen" description="Ruang kerja Owner, Admin, dan Manager." />}
+        />
+      </Route>
+
+      <Route element={<ProtectedRoute allowedRoles={['cashier', 'waiter']} />}>
+        <Route
+          path="/pos"
+          element={<WorkspacePage title="Dashboard Operasional POS" description="Ruang kerja Kasir dan Pelayan." />}
+        />
+      </Route>
+
+      <Route element={<ProtectedRoute allowedRoles={['kitchen']} />}>
+        <Route
+          path="/dapur"
+          element={<WorkspacePage title="Dashboard Dapur (KDS)" description="Ruang kerja Staf Dapur." />}
+        />
+      </Route>
+
+      <Route element={<ProtectedRoute />}>
+        <Route
+          path="/tanpa-akses"
+          element={<WorkspacePage title="Belum ada akses" description="Akun Anda belum diberi role. Hubungi owner." />}
+        />
+      </Route>
+
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
   )
 }
