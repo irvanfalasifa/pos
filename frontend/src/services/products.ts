@@ -20,6 +20,17 @@ export type Product = {
   categoryId: number
   category: { id: number; name: string }
   variants: Variant[]
+    modifierGroups: {
+    groupId: number
+    group: {
+      id: number
+      name: string
+      minSelect: number
+      maxSelect: number
+      isActive: boolean
+      options: ModifierOption[]
+    }
+  }[]
 }
 
 export type ProductInput = {
@@ -29,7 +40,8 @@ export type ProductInput = {
   price: number
   categoryId: number
   isActive?: boolean
-  variants?: { id?: number; name: string; priceDelta: number }[]
+    variants?: { id?: number; name: string; priceDelta: number }[]
+    modifierGroupIds?: number[]
 }
 
 export type ProductFilters = {
@@ -58,4 +70,32 @@ export const createProduct = (data: ProductInput) =>
   api<Product>('/products', { method: 'POST', body: JSON.stringify(data) })
 
 export const updateProduct = (id: number, data: Partial<ProductInput>) =>
-  api<Product>(`/products/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
+    api<Product>(`/products/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
+
+export type ModifierOption = { id: number; name: string; price: number }
+
+export type ModifierGroup = {
+  id: number
+  name: string
+  minSelect: number
+  maxSelect: number
+  isActive: boolean
+  options: ModifierOption[]
+  _count: { products: number }
+}
+
+export type ModifierGroupInput = {
+  name: string
+  minSelect: number
+  maxSelect: number
+  isActive?: boolean
+  options?: { id?: number; name: string; price: number }[]
+}
+
+export const getModifierGroups = () => api<ModifierGroup[]>('/modifier-groups')
+
+export const createModifierGroup = (data: ModifierGroupInput) =>
+  api<ModifierGroup>('/modifier-groups', { method: 'POST', body: JSON.stringify(data) })
+
+export const updateModifierGroup = (id: number, data: Partial<ModifierGroupInput>) =>
+  api<ModifierGroup>(`/modifier-groups/${id}`, { method: 'PATCH', body: JSON.stringify(data) })

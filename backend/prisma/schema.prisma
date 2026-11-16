@@ -69,6 +69,7 @@ model Product {
   categoryId  Int
   category    Category         @relation(fields: [categoryId], references: [id])
   variants    ProductVariant[]
+  modifierGroups ProductModifierGroup[]
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 }
@@ -80,4 +81,32 @@ model ProductVariant {
   priceDelta Int     @default(0)
   isActive   Boolean @default(true)
   product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model ModifierGroup {
+  id        Int                    @id @default(autoincrement())
+  name      String                 @unique
+  minSelect Int                    @default(0)
+  maxSelect Int                    @default(1)
+  isActive  Boolean                @default(true)
+  options   Modifier[]
+  products  ProductModifierGroup[]
+}
+
+model Modifier {
+  id       Int           @id @default(autoincrement())
+  groupId  Int
+  name     String
+  price    Int           @default(0)
+  isActive Boolean       @default(true)
+  group    ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+}
+
+model ProductModifierGroup {
+  productId Int
+  groupId   Int
+  product   Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  group     ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([productId, groupId])
 }

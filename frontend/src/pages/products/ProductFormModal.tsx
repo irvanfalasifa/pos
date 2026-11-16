@@ -5,7 +5,7 @@ import { Plus, Trash2, Loader2 } from 'lucide-react'
 import Modal from '../../components/Modal'
 import Toggle from '../../components/Toggle'
 import { createProduct, updateProduct } from '../../services/products'
-import type { Category, Product, ProductInput } from '../../services/products'
+import type { Category, ModifierGroup, Product, ProductInput } from '../../services/products'
 import { useToastStore } from '../../stores/toastStore'
 import { formatRupiah } from '../../lib/format'
 
@@ -21,10 +21,12 @@ const labelClass = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-sl
 export default function ProductFormModal({
   product,
   categories,
+  modifierGroups,
   onClose,
 }: {
   product: Product | null
   categories: Category[]
+  modifierGroups: ModifierGroup[]
   onClose: () => void
 }) {
   const queryClient = useQueryClient()
@@ -44,7 +46,8 @@ export default function ProductFormModal({
       priceDelta: String(v.priceDelta),
     })) ?? [],
   )
-  const [error, setError] = useState('')
+    const [error, setError] = useState('')
+      const [groupIds, setGroupIds] = useState<number[]>(product?.modifierGroups.map((m) => m.groupId) ?? [])
 
   const availableCategories = categories.filter((c) => c.isActive || c.id === product?.categoryId)
 
@@ -86,6 +89,7 @@ export default function ProductFormModal({
       price: priceNumber,
       categoryId: Number(categoryId),
       isActive,
+      modifierGroupIds: groupIds,
       variants: variants.map((v) => ({
         id: v.id,
         name: v.name.trim(),
@@ -175,9 +179,46 @@ export default function ProductFormModal({
           )}
         </div>
 
+                <div>
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Grup modifier</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Pilihan tambahan saat produk dipesan, misalnya level gula atau topping.
+          </p>
+
+          {modifierGroups.length === 0 ? (
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              Belum ada grup. Buat lewat tombol Modifier di halaman Produk.
+            </p>
+          ) : (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {modifierGroups
+                .filter((g) => g.isActive || groupIds.includes(g.id))
+                .map((g) => {
+                  const on = groupIds.includes(g.id)
+                  return (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() =>
+                        setGroupIds((ids) => (on ? ids.filter((i) => i !== g.id) : [...ids, g.id]))
+                      }
+                      className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                        on
+                          ? 'bg-amber-500 text-white shadow-md shadow-amber-500/30'
+                          : 'bg-slate-100 text-slate-700 hover:bg-amber-100 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-amber-500/20'
+                      }`}
+                    >
+                      {g.name}
+                    </button>
+                  )
+                })}
+            </div>
+          )}
+            </div>
+              
         {error && (
           <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-400">{error}</p>
-        )}
+        )}      
 
         <div className="flex justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-800">
           <button type="button" onClick={onClose} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">

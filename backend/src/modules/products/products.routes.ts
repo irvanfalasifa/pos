@@ -22,6 +22,13 @@ const categoryInclude = { _count: { select: { products: true } } } as const
 const productInclude = {
   category: { select: { id: true, name: true } },
   variants: { where: { isActive: true }, orderBy: { id: 'asc' } },
+  modifierGroups: {
+    include: {
+      group: {
+        include: { options: { where: { isActive: true }, orderBy: { id: 'asc' } } },
+      },
+    },
+  },
 } as const
 
 /* ---------------- Kategori ---------------- */
@@ -97,12 +104,13 @@ const productSchema = z.object({
   categoryId: z.number().int().positive(),
   isActive: z.boolean().optional(),
   variants: z.array(variantSchema).max(20).optional(),
+  modifierGroupIds: z.array(z.number().int().positive()).max(20).optional(),
 })
 
 function sendProductError(e: unknown, res: Response) {
   const code = prismaCode(e)
   if (code === 'P2002') return res.status(409).json({ message: 'SKU sudah dipakai produk lain' })
-  if (code === 'P2003') return res.status(400).json({ message: 'Kategori tidak ditemukan' })
+  if (code === 'P2003') return res.status(400).json({ message: 'Kategori atau grup modifier tidak ditemukan' })
   if (code === 'P2025') return res.status(404).json({ message: 'Produk tidak ditemukan' })
   throw e
 }
@@ -134,7 +142,7 @@ productsRouter.get('/products', requireAuth, requirePermission('product.view'), 
 productsRouter.post('/products', requireAuth, requirePermission('product.create'), async (req, res) => {
   const parsed = productSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ message: 'Data produk tidak valid' })
-  const { variants, sku, description, ...rest } = parsed.data
+  const { variants, modifierGroupIds, sku, description, ...rest } = parsed.data
 
   try {
     const product = await prisma.product.create({
@@ -144,6 +152,13 @@ productsRouter.post('/products', requireAuth, requirePermission('product.create'
         description: description || null,
         ...(variants?.length
           ? { variants: { create: variants.map((v) => ({ name: v.name, priceDelta: v.priceDelta })) } }
+          : {}),
+        ...(modifierGroupIds?.length
+          ? {
+              modifierGroups: {
+                create: [...new Set(modifierGroupIds)].map((groupId) => ({ groupId })),
+              },
+            }
           : {}),
       },
       include: productInclude,
@@ -160,7 +175,7 @@ productsRouter.patch('/products/:id', requireAuth, requirePermission('product.up
 
   const parsed = productSchema.partial().safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ message: 'Data produk tidak valid' })
-  const { variants, sku, description, ...rest } = parsed.data
+  const { variants, modifierGroupIds, sku, description, ...rest } = parsed.data
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -193,6 +208,16 @@ productsRouter.patch('/products/:id', requireAuth, requirePermission('product.up
               data: { productId: id, name: v.name, priceDelta: v.priceDelta },
             })
           }
+        }
+      }
+
+      if (modifierGroupIds) {
+        // Tabel penghubung tidak menyimpan riwayat, jadi aman diganti seluruhnya.
+        await tx.productModifierGroup.deleteMany({ where: { productId: id } })
+        if (modifierGroupIds.length > 0) {
+          await tx.productModifierGroup.createMany({
+            data: [...new Set(modifierGroupIds)].map((groupId) => ({ productId: id, groupId })),
+          })
         }
       }
     })

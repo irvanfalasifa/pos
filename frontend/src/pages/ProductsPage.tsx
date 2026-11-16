@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Package, Pencil, Plus, Search, Tags } from 'lucide-react'
+import { Package, Pencil, Plus, Search, SlidersHorizontal, Tags } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { useToastStore } from '../stores/toastStore'
-import { getCategories, getProducts, updateProduct } from '../services/products'
+import { getCategories, getModifierGroups, getProducts, updateProduct } from '../services/products'
 import type { Product, ProductFilters } from '../services/products'
 import { formatRupiah } from '../lib/format'
 import Toggle from '../components/Toggle'
 import ProductFormModal from './products/ProductFormModal'
 import CategoryModal from './products/CategoryModal'
+import ModifierModal from './products/ModifierModal'
 
 export default function ProductsPage() {
   const user = useAuthStore((s) => s.user)
@@ -22,6 +23,7 @@ export default function ProductsPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
   const [categoriesOpen, setCategoriesOpen] = useState(false)
+    const [modifiersOpen, setModifiersOpen] = useState(false)
 
   const canCreate = !!user?.permissions.includes('product.create')
   const canUpdate = !!user?.permissions.includes('product.update')
@@ -31,7 +33,8 @@ export default function ProductsPage() {
     return () => clearTimeout(t)
   }, [search])
 
-  const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: getCategories })
+    const categoriesQuery = useQuery({ queryKey: ['categories'], queryFn: getCategories })
+      const modifierGroupsQuery = useQuery({ queryKey: ['modifier-groups'], queryFn: getModifierGroups })
 
   const productsQuery = useQuery({
     queryKey: ['products', debouncedSearch, categoryId, status],
@@ -48,7 +51,8 @@ export default function ProductsPage() {
     onError: (e) => push('error', e instanceof Error ? e.message : 'Gagal mengubah status'),
   })
 
-  const categories = categoriesQuery.data ?? []
+    const categories = categoriesQuery.data ?? []
+      const modifierGroups = modifierGroupsQuery.data ?? []
   const products = productsQuery.data ?? []
 
   function openCreate() {
@@ -119,6 +123,13 @@ export default function ProductsPage() {
         <div className="flex gap-2 overflow-x-auto pb-1">
           <button onClick={() => setCategoryId(null)} className={`${chipBase} ${categoryId === null ? chipOn : chipOff}`}>
             Semua
+                  </button>
+                            <button
+            onClick={() => setModifiersOpen(true)}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Modifier
           </button>
           {categories
             .filter((c) => c.isActive)
@@ -225,6 +236,7 @@ export default function ProductsPage() {
           key={editing?.id ?? 'baru'}
           product={editing}
           categories={categories}
+          modifierGroups={modifierGroups}
           onClose={() => setFormOpen(false)}
         />
       )}
@@ -235,6 +247,14 @@ export default function ProductsPage() {
           canCreate={canCreate}
           canEdit={canUpdate}
           onClose={() => setCategoriesOpen(false)}
+        />
+      )}
+      {modifiersOpen && (
+        <ModifierModal
+          groups={modifierGroups}
+          canCreate={canCreate}
+          canEdit={canUpdate}
+          onClose={() => setModifiersOpen(false)}
         />
       )}
     </div>
