@@ -5,6 +5,7 @@ import helmet from 'helmet'
 import cookieParser from 'cookie-parser'
 import { prisma } from './lib/prisma.js'
 import { authRouter } from './modules/auth/auth.routes.js'
+import { productsRouter } from './modules/products/products.routes.js'
 import { requireAuth, requirePermission } from './middleware/auth.js'
 
 const app = express()
@@ -19,8 +20,8 @@ app.get('/api/health', (_req, res) => {
 })
 
 app.use('/api/auth', authRouter)
+app.use('/api', productsRouter)
 
-// Hanya yang punya izin user.manage (owner)
 app.get('/api/roles', requireAuth, requirePermission('user.manage'), async (_req, res) => {
   const roles = await prisma.role.findMany({
     include: { permissions: { include: { permission: true } } },
@@ -28,7 +29,6 @@ app.get('/api/roles', requireAuth, requirePermission('user.manage'), async (_req
   res.json(roles)
 })
 
-// Rute uji coba izin: hanya yang punya report.view
 app.get('/api/reports/ping', requireAuth, requirePermission('report.view'), (_req, res) => {
   res.json({ message: 'Berhasil: Anda boleh melihat laporan' })
 })

@@ -50,3 +50,34 @@ model RolePermission {
 
   @@id([roleId, permissionId])
 }
+
+model Category {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  sortOrder Int       @default(0)
+  isActive  Boolean   @default(true)
+  products  Product[]
+}
+
+model Product {
+  id          Int              @id @default(autoincrement())
+  name        String
+  sku         String?          @unique
+  description String?
+  price       Int
+  isActive    Boolean          @default(true)
+  categoryId  Int
+  category    Category         @relation(fields: [categoryId], references: [id])
+  variants    ProductVariant[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model ProductVariant {
+  id         Int     @id @default(autoincrement())
+  productId  Int
+  name       String
+  priceDelta Int     @default(0)
+  isActive   Boolean @default(true)
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}

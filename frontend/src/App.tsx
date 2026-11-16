@@ -8,6 +8,7 @@ import PlaceholderPage from './pages/PlaceholderPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import RequirePermission from './components/RequirePermission'
 import AppLayout from './components/AppLayout'
+import ProductsPage from './pages/ProductsPage'
 
 export default function App() {
   const fetchMe = useAuthStore((s) => s.fetchMe)
@@ -28,7 +29,7 @@ export default function App() {
             path="/manajemen/produk"
             element={
               <RequirePermission code="product.view">
-                <PlaceholderPage title="Produk" description="Kelola produk, kategori, varian, dan modifier." />
+                <ProductsPage />
               </RequirePermission>
             }
           />
