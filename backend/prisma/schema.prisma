@@ -16,6 +16,7 @@ model User {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
   roles        UserRole[]
+  orders       Order[]
 }
 
 model Role {
@@ -72,6 +73,7 @@ model Product {
   modifierGroups ProductModifierGroup[]
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
+  orderItems  OrderItem[]
 }
 
 model ProductVariant {
@@ -81,6 +83,7 @@ model ProductVariant {
   priceDelta Int     @default(0)
   isActive   Boolean @default(true)
   product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems  OrderItem[]
 }
 
 model ModifierGroup {
@@ -100,6 +103,7 @@ model Modifier {
   price    Int           @default(0)
   isActive Boolean       @default(true)
   group    ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  orderItemModifiers  OrderItemModifier[]
 }
 
 model ProductModifierGroup {
@@ -109,4 +113,115 @@ model ProductModifierGroup {
   group     ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@id([productId, groupId])
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  CLEANING
+}
+
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+  DELIVERY
+  QR_TABLE
+}
+
+enum OrderStatus {
+  DRAFT
+  PLACED
+  CONFIRMED
+  PREPARING
+  READY
+  SERVED
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  FAILED
+  PARTIALLY_REFUNDED
+  REFUNDED
+}
+
+model Setting {
+  key   String @id
+  value String
+}
+
+model Area {
+  id     Int               @id @default(autoincrement())
+  name   String            @unique
+  tables RestaurantTable[]
+}
+
+model RestaurantTable {
+  id            Int         @id @default(autoincrement())
+  name          String
+  capacity      Int         @default(4)
+  status        TableStatus @default(AVAILABLE)
+  isActive      Boolean     @default(true)
+  occupiedSince DateTime?
+  areaId        Int
+  area          Area        @relation(fields: [areaId], references: [id])
+  orders        Order[]
+
+  @@unique([areaId, name])
+}
+
+model Order {
+  id            Int              @id @default(autoincrement())
+  number        String           @unique
+  type          OrderType
+  status        OrderStatus      @default(PLACED)
+  paymentStatus PaymentStatus    @default(UNPAID)
+  tableId       Int?
+  table         RestaurantTable? @relation(fields: [tableId], references: [id])
+  customerName  String?
+  note          String?
+  subtotal      Int
+  serviceBp     Int
+  serviceAmount Int
+  taxBp         Int
+  taxAmount     Int
+  total         Int
+  createdById   Int
+  createdBy     User             @relation(fields: [createdById], references: [id])
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  items         OrderItem[]
+
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id          Int                 @id @default(autoincrement())
+  orderId     Int
+  order       Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   Int
+  product     Product             @relation(fields: [productId], references: [id])
+  variantId   Int?
+  variant     ProductVariant?     @relation(fields: [variantId], references: [id])
+  productName String
+  variantName String?
+  unitPrice   Int
+  quantity    Int
+  note        String?
+  lineTotal   Int
+  modifiers   OrderItemModifier[]
+}
+
+model OrderItemModifier {
+  id          Int       @id @default(autoincrement())
+  orderItemId Int
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  modifierId  Int
+  modifier    Modifier  @relation(fields: [modifierId], references: [id])
+  name        String
+  price       Int
 }

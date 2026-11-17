@@ -7,6 +7,7 @@ import { prisma } from './lib/prisma.js'
 import { authRouter } from './modules/auth/auth.routes.js'
 import { productsRouter } from './modules/products/products.routes.js'
 import { modifiersRouter } from './modules/products/modifiers.routes.js'
+import { posRouter } from './modules/pos/pos.routes.js'
 import { requireAuth, requirePermission } from './middleware/auth.js'
 
 const app = express()
@@ -23,6 +24,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth', authRouter)
 app.use('/api', productsRouter)
 app.use('/api', modifiersRouter)
+app.use('/api', posRouter)
 
 app.get('/api/roles', requireAuth, requirePermission('user.manage'), async (_req, res) => {
   const roles = await prisma.role.findMany({

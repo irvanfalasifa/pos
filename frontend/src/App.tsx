@@ -9,6 +9,9 @@ import ProtectedRoute from './components/ProtectedRoute'
 import RequirePermission from './components/RequirePermission'
 import AppLayout from './components/AppLayout'
 import ProductsPage from './pages/ProductsPage'
+import CashierPage from './pages/CashierPage'
+import TablesPage from './pages/TablesPage'
+import OrdersPage from './pages/OrdersPage'
 
 export default function App() {
   const fetchMe = useAuthStore((s) => s.fetchMe)
@@ -67,7 +70,7 @@ export default function App() {
             path="/pos"
             element={
               <RequirePermission code="order.create">
-                <PlaceholderPage title="Kasir" description="Pilih produk dan buat pesanan." />
+                <CashierPage />
               </RequirePermission>
             }
           />
@@ -75,7 +78,7 @@ export default function App() {
             path="/pos/meja"
             element={
               <RequirePermission code="order.view">
-                <PlaceholderPage title="Meja" description="Pantau status meja restoran." />
+                <TablesPage />
               </RequirePermission>
             }
           />
@@ -83,7 +86,7 @@ export default function App() {
             path="/pos/transaksi"
             element={
               <RequirePermission code="order.view">
-                <PlaceholderPage title="Transaksi" description="Riwayat transaksi dan struk." />
+                <OrdersPage />
               </RequirePermission>
             }
           />
