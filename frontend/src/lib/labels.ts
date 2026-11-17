@@ -1,4 +1,4 @@
-import type { OrderStatus, OrderType, PaymentStatus, TableStatus } from '../services/pos'
+import type { OrderStatus, OrderType, PaymentMethod, PaymentStatus, TableStatus } from '../services/pos'
 
 export const orderTypeLabel: Record<OrderType, string> = {
   DINE_IN: 'Dine In',
@@ -48,4 +48,12 @@ export const tableStatusInfo: Record<TableStatus, { label: string; chip: string;
     chip: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
     border: 'border-amber-300 dark:border-amber-500/40',
   },
+}
+
+export const paymentMethodLabel: Record<PaymentMethod, string> = {
+  CASH: 'Tunai',
+  QRIS: 'QRIS',
+  CARD: 'Kartu',
+  EWALLET: 'E-Wallet',
+  TRANSFER: 'Transfer',
 }

@@ -32,12 +32,36 @@ const orderInclude = {
   table: { select: { id: true, name: true } },
   createdBy: { select: { id: true, name: true } },
   items: { include: { modifiers: true }, orderBy: { id: 'asc' } },
+  payments: {
+    select: {
+      id: true,
+      method: true,
+      amount: true,
+      tendered: true,
+      changeAmount: true,
+      reference: true,
+      createdAt: true,
+    },
+    orderBy: { id: 'asc' },
+  },
 } as const
 
 /* ---------------- Konfigurasi ---------------- */
 
-posRouter.get('/pos/config', requireAuth, requirePermission('order.create'), async (_req, res) => {
-  res.json(await getRates())
+async function getBusiness() {
+  const rows = await prisma.setting.findMany({
+    where: { key: { in: ['business_name', 'business_address', 'receipt_footer'] } },
+  })
+  const read = (key: string, fallback: string) => rows.find((r) => r.key === key)?.value ?? fallback
+  return {
+    businessName: read('business_name', 'POS Restoran'),
+    businessAddress: read('business_address', ''),
+    receiptFooter: read('receipt_footer', 'Terima kasih atas kunjungan Anda'),
+  }
+}
+
+posRouter.get('/pos/config', requireAuth, requirePermission('order.view'), async (_req, res) => {
+  res.json({ ...(await getRates()), ...(await getBusiness()) })
 })
 
 /* ---------------- Meja ---------------- */
@@ -257,15 +281,144 @@ posRouter.post('/orders', requireAuth, requirePermission('order.create'), async 
   }
 })
 
-posRouter.get('/orders', requireAuth, requirePermission('order.view'), async (_req, res) => {
-  const start = new Date()
+const listQuery = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  search: z.string().trim().max(40).optional(),
+})
+
+posRouter.get('/orders', requireAuth, requirePermission('order.view'), async (req, res) => {
+  const parsed = listQuery.safeParse(req.query)
+  if (!parsed.success) return res.status(400).json({ message: 'Filter tidak valid' })
+  const { date, search } = parsed.data
+
+  const base = date ? new Date(`${date}T00:00:00`) : new Date()
+  if (Number.isNaN(base.getTime())) return res.status(400).json({ message: 'Tanggal tidak valid' })
+
+  const start = new Date(base)
   start.setHours(0, 0, 0, 0)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 1)
 
   const orders = await prisma.order.findMany({
-    where: { createdAt: { gte: start } },
+    where: {
+      createdAt: { gte: start, lt: end },
+      ...(search ? { number: { contains: search, mode: 'insensitive' as const } } : {}),
+    },
     orderBy: { createdAt: 'desc' },
-    take: 100,
+    take: 200,
     include: orderInclude,
   })
   res.json(orders)
+})
+
+/* ---------------- Pembayaran ---------------- */
+
+class PaymentError extends Error {
+  status: number
+
+  constructor(message: string, status = 400) {
+    super(message)
+    this.status = status
+  }
+}
+
+const paymentSchema = z.object({
+  idempotencyKey: z.string().min(8).max(64),
+  payments: z
+    .array(
+      z.object({
+        method: z.enum(['CASH', 'QRIS', 'CARD', 'EWALLET', 'TRANSFER']),
+        amount: z.number().int().min(1).max(1_000_000_000),
+        tendered: z.number().int().min(0).max(1_000_000_000).nullable().optional(),
+        reference: z.string().trim().max(60).nullable().optional(),
+      }),
+    )
+    .min(1)
+    .max(5),
+})
+
+type PaymentInput = z.infer<typeof paymentSchema>
+
+async function payOrder(orderId: number, input: PaymentInput, userId: number) {
+  // Permintaan yang sama yang terkirim ulang tidak boleh mencatat pembayaran ganda
+  const duplicate = await prisma.payment.findFirst({
+    where: { idempotencyKey: { startsWith: `${input.idempotencyKey}:` } },
+  })
+  if (duplicate) {
+    if (duplicate.orderId !== orderId) throw new PaymentError('Kunci pembayaran sudah dipakai')
+    return prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: orderInclude })
+  }
+
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      return await prisma.$transaction(
+        async (tx) => {
+          const order = await tx.order.findUnique({ where: { id: orderId }, include: { payments: true } })
+          if (!order) throw new PaymentError('Pesanan tidak ditemukan', 404)
+          if (order.status === 'CANCELLED') throw new PaymentError('Pesanan sudah dibatalkan')
+
+          const paid = order.payments.reduce((sum, p) => sum + p.amount, 0)
+          const balance = order.total - paid
+          if (balance <= 0) throw new PaymentError('Pesanan ini sudah lunas')
+
+          const sum = input.payments.reduce((s, p) => s + p.amount, 0)
+          if (sum > balance) throw new PaymentError('Jumlah pembayaran melebihi sisa tagihan')
+
+          const rows = input.payments.map((p, index) => {
+            const base = {
+              method: p.method,
+              amount: p.amount,
+              reference: p.reference || null,
+              idempotencyKey: `${input.idempotencyKey}:${index}`,
+            }
+            if (p.method === 'CASH') {
+              if (p.tendered == null || p.tendered < p.amount) {
+                throw new PaymentError('Uang diterima kurang dari jumlah tunai')
+              }
+              return { ...base, tendered: p.tendered, changeAmount: p.tendered - p.amount }
+            }
+            return { ...base, tendered: null, changeAmount: null }
+          })
+
+          await tx.payment.createMany({
+            data: rows.map((r) => ({ ...r, orderId, createdById: userId })),
+          })
+
+          return tx.order.update({
+            where: { id: orderId },
+            data: { paymentStatus: paid + sum >= order.total ? 'PAID' : 'PARTIALLY_PAID' },
+            include: orderInclude,
+          })
+        },
+        { isolationLevel: 'Serializable' },
+      )
+    } catch (e) {
+      const code = prismaCode(e)
+      if (code === 'P2034' && attempt < 3) continue
+      if (code === 'P2002') {
+        return prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: orderInclude })
+      }
+      throw e
+    }
+  }
+
+  throw new PaymentError('Server sedang sibuk, silakan coba lagi', 503)
+}
+
+posRouter.post('/orders/:id/payments', requireAuth, requirePermission('payment.create'), async (req, res) => {
+  const id = parseId(req.params.id)
+  if (!id) return res.status(400).json({ message: 'ID tidak valid' })
+
+  const parsed = paymentSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Data pembayaran tidak valid' })
+
+  const user = res.locals.user as AuthUser
+
+  try {
+    const order = await payOrder(id, parsed.data, user.id)
+    res.json(order)
+  } catch (e) {
+    if (e instanceof PaymentError) return res.status(e.status).json({ message: e.message })
+    throw e
+  }
 })

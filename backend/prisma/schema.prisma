@@ -17,6 +17,7 @@ model User {
   updatedAt    DateTime   @updatedAt
   roles        UserRole[]
   orders       Order[]
+  payments     Payment[]
 }
 
 model Role {
@@ -195,6 +196,7 @@ model Order {
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
   items         OrderItem[]
+  payments      Payment[]
 
   @@index([createdAt])
 }
@@ -224,4 +226,29 @@ model OrderItemModifier {
   modifier    Modifier  @relation(fields: [modifierId], references: [id])
   name        String
   price       Int
+}
+
+enum PaymentMethod {
+  CASH
+  QRIS
+  CARD
+  EWALLET
+  TRANSFER
+}
+
+model Payment {
+  id             Int           @id @default(autoincrement())
+  orderId        Int
+  order          Order         @relation(fields: [orderId], references: [id])
+  method         PaymentMethod
+  amount         Int
+  tendered       Int?
+  changeAmount   Int?
+  reference      String?
+  idempotencyKey String        @unique
+  createdById    Int
+  createdBy      User          @relation(fields: [createdById], references: [id])
+  createdAt      DateTime      @default(now())
+
+  @@index([orderId])
 }

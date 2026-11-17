@@ -30,7 +30,13 @@ export type RestaurantTable = {
 
 export type Area = { id: number; name: string; tables: RestaurantTable[] }
 
-export type PosConfig = { taxBp: number; serviceBp: number }
+export type PosConfig = {
+  taxBp: number
+  serviceBp: number
+  businessName: string
+  businessAddress: string
+  receiptFooter: string
+}
 
 export type OrderItem = {
   id: number
@@ -61,6 +67,7 @@ export type Order = {
   createdBy: { id: number; name: string }
   createdAt: string
   items: OrderItem[]
+  payments: Payment[]
 }
 
 export type OrderInput = {
@@ -86,4 +93,33 @@ export const updateTableStatus = (id: number, status: TableStatus) =>
 export const createOrder = (data: OrderInput) =>
   api<Order>('/orders', { method: 'POST', body: JSON.stringify(data) })
 
-export const getOrders = () => api<Order[]>('/orders')
+export function getOrders(params: { date: string; search: string }) {
+  const query = new URLSearchParams({ date: params.date })
+  if (params.search) query.set('search', params.search)
+  return api<Order[]>(`/orders?${query.toString()}`)
+}
+
+export type PaymentMethod = 'CASH' | 'QRIS' | 'CARD' | 'EWALLET' | 'TRANSFER'
+
+export type Payment = {
+  id: number
+  method: PaymentMethod
+  amount: number
+  tendered: number | null
+  changeAmount: number | null
+  reference: string | null
+  createdAt: string
+}
+
+export type PaymentInput = {
+  idempotencyKey: string
+  payments: {
+    method: PaymentMethod
+    amount: number
+    tendered: number | null
+    reference: string | null
+  }[]
+}
+
+export const payOrder = (orderId: number, data: PaymentInput) =>
+  api<Order>(`/orders/${orderId}/payments`, { method: 'POST', body: JSON.stringify(data) })
