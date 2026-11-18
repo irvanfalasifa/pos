@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma.js'
 import { requireAuth, requirePermission } from '../../middleware/auth.js'
 import type { AuthUser } from '../../middleware/auth.js'
+import { emitOrdersChanged, emitTablesChanged } from '../../realtime/socket.js'
 
 export const posRouter = Router()
 
@@ -96,6 +97,7 @@ posRouter.patch('/tables/:id/status', requireAuth, requirePermission('order.crea
       occupiedSince: status === 'OCCUPIED' ? (table.occupiedSince ?? new Date()) : null,
     },
   })
+  emitTablesChanged()
   res.json(updated)
 })
 
@@ -274,6 +276,8 @@ posRouter.post('/orders', requireAuth, requirePermission('order.create'), async 
 
   try {
     const order = await createOrder(parsed.data, user.id)
+    emitOrdersChanged({ id: order.id, number: order.number, status: order.status, reason: 'created' })
+    if (order.tableId) emitTablesChanged()
     res.status(201).json(order)
   } catch (e) {
     if (e instanceof OrderError) return res.status(400).json({ message: e.message })
@@ -384,9 +388,22 @@ async function payOrder(orderId: number, input: PaymentInput, userId: number) {
             data: rows.map((r) => ({ ...r, orderId, createdById: userId })),
           })
 
+                    const fullyPaid = paid + sum >= order.total
+          // Pesanan yang sudah disajikan dan kini lunas otomatis selesai
+          const completes = fullyPaid && order.status === 'SERVED'
+
+          if (completes) {
+            await tx.orderStatusLog.create({
+              data: { orderId, fromStatus: 'SERVED', toStatus: 'COMPLETED', userId },
+            })
+          }
+
           return tx.order.update({
             where: { id: orderId },
-            data: { paymentStatus: paid + sum >= order.total ? 'PAID' : 'PARTIALLY_PAID' },
+            data: {
+              paymentStatus: fullyPaid ? 'PAID' : 'PARTIALLY_PAID',
+              ...(completes ? { status: 'COMPLETED' as const } : {}),
+            },
             include: orderInclude,
           })
         },
@@ -416,6 +433,7 @@ posRouter.post('/orders/:id/payments', requireAuth, requirePermission('payment.c
 
   try {
     const order = await payOrder(id, parsed.data, user.id)
+    emitOrdersChanged({ id: order.id, number: order.number, status: order.status, reason: 'paid' })
     res.json(order)
   } catch (e) {
     if (e instanceof PaymentError) return res.status(e.status).json({ message: e.message })

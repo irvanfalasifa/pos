@@ -1,18 +1,21 @@
 import { useEffect, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { Banknote, Printer, Receipt as ReceiptIcon, Search } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Banknote, Check, Printer, Receipt as ReceiptIcon, Search } from 'lucide-react'
 import { getOrders, getPosConfig } from '../services/pos'
 import type { Order, PaymentStatus } from '../services/pos'
+import { updateOrderStatus } from '../services/kds'
 import { useAuthStore } from '../stores/authStore'
+import { useToastStore } from '../stores/toastStore'
 import { formatRupiah } from '../lib/format'
 import { orderStatusInfo, orderTypeLabel, paymentMethodLabel, paymentStatusInfo } from '../lib/labels'
 import PaymentModal from './orders/PaymentModal'
 import ReceiptModal from './orders/ReceiptModal'
 
-type Filter = 'ALL' | PaymentStatus
+type Filter = 'ALL' | 'READY' | PaymentStatus
 
 const filters: { value: Filter; label: string }[] = [
   { value: 'ALL', label: 'Semua' },
+  { value: 'READY', label: 'Siap disajikan' },
   { value: 'UNPAID', label: 'Belum bayar' },
   { value: 'PARTIALLY_PAID', label: 'Sebagian' },
   { value: 'PAID', label: 'Lunas' },
@@ -22,7 +25,11 @@ const paidOf = (o: Order) => o.payments.reduce((sum, p) => sum + p.amount, 0)
 
 export default function OrdersPage() {
   const user = useAuthStore((s) => s.user)
+  const push = useToastStore((s) => s.push)
+  const queryClient = useQueryClient()
+
   const canPay = !!user?.permissions.includes('payment.create')
+  const canServe = !!user?.permissions.includes('order.create')
 
   const [date, setDate] = useState(() => new Date().toLocaleDateString('sv-SE'))
   const [search, setSearch] = useState('')
@@ -43,10 +50,26 @@ export default function OrdersPage() {
   })
   const configQuery = useQuery({ queryKey: ['pos-config'], queryFn: getPosConfig })
 
-  const orders = ordersQuery.data ?? []
-  const visible = orders.filter((o) => filter === 'ALL' || o.paymentStatus === filter)
+  const serveMutation = useMutation({
+    mutationFn: (id: number) => updateOrderStatus(id, 'SERVED'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] })
+      queryClient.invalidateQueries({ queryKey: ['kds'] })
+      push('success', 'Pesanan ditandai sudah selesai disajikan')
+    },
+    onError: (e) => push('error', e instanceof Error ? e.message : 'Gagal mengubah status'),
+  })
 
+  const orders = ordersQuery.data ?? []
   const active = orders.filter((o) => o.status !== 'CANCELLED')
+  const readyCount = active.filter((o) => o.status === 'READY').length
+
+  const visible = orders.filter((o) => {
+    if (filter === 'ALL') return true
+    if (filter === 'READY') return o.status === 'READY'
+    return o.paymentStatus === filter
+  })
+
   const received = active.reduce((sum, o) => sum + paidOf(o), 0)
   const outstanding = active.reduce((sum, o) => sum + (o.total - paidOf(o)), 0)
 
@@ -61,6 +84,20 @@ export default function OrdersPage() {
         <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Transaksi</h1>
         <p className="mt-1 text-slate-500 dark:text-slate-400">Riwayat pesanan, pembayaran, dan struk.</p>
       </div>
+
+      {canServe && readyCount > 0 && filter !== 'READY' && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-sky-50 px-5 py-4 dark:bg-sky-500/10">
+          <p className="font-medium text-sky-800 dark:text-sky-300">
+            {readyCount} pesanan siap disajikan atau diambil
+          </p>
+          <button
+            onClick={() => setFilter('READY')}
+            className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700 active:scale-[0.98]"
+          >
+            Lihat
+          </button>
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-3">
         {[
@@ -96,8 +133,13 @@ export default function OrdersPage() {
 
       <div className="flex gap-2 overflow-x-auto pb-1">
         {filters.map((f) => (
-          <button key={f.value} onClick={() => setFilter(f.value)} className={`${chipBase} ${filter === f.value ? chipOn : chipOff}`}>
+          <button
+            key={f.value}
+            onClick={() => setFilter(f.value)}
+            className={`${chipBase} ${filter === f.value ? chipOn : chipOff}`}
+          >
             {f.label}
+            {f.value === 'READY' && readyCount > 0 ? ` (${readyCount})` : ''}
           </button>
         ))}
       </div>
@@ -178,7 +220,17 @@ export default function OrdersPage() {
                     )}
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    {canServe && o.status === 'READY' && (
+                      <button
+                        onClick={() => serveMutation.mutate(o.id)}
+                        disabled={serveMutation.isPending}
+                        className="flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700 active:scale-[0.98] disabled:opacity-60"
+                      >
+                        <Check className="h-4 w-4" />
+                        {o.type === 'DINE_IN' ? 'Sudah disajikan' : 'Sudah diambil'}
+                      </button>
+                    )}
                     <button
                       onClick={() => setReceipt({ order: o, isCopy: o.paymentStatus === 'PAID' })}
                       className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"

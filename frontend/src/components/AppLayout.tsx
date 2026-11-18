@@ -10,11 +10,15 @@ import {
   ChevronsLeft,
   ChevronsRight,
   ChevronDown,
+  Wifi,
+  WifiOff,
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { useThemeStore } from '../stores/themeStore'
 import { workspaces, accessibleWorkspaces, visibleItems } from '../config/navigation'
 import type { NavItem, Workspace, WorkspaceKey } from '../config/navigation'
+import { useRealtime } from '../hooks/useRealtime'
+import { useRealtimeStore } from '../stores/realtimeStore'
 
 type SidebarProps = {
   workspace: Workspace
@@ -100,6 +104,8 @@ export default function AppLayout({ workspace }: { workspace: WorkspaceKey }) {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const connected = useRealtimeStore((s) => s.connected)
+  useRealtime(!!user?.permissions.includes('order.view'))
 
   if (!user) return null
 
@@ -164,6 +170,19 @@ export default function AppLayout({ workspace }: { workspace: WorkspaceKey }) {
           </div>
 
           <div className="flex items-center gap-2">
+                        {user.permissions.includes('order.view') && (
+              <span
+                title={connected ? 'Terhubung secara real-time' : 'Terputus, mencoba menyambung ulang'}
+                className={`hidden items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium sm:flex ${
+                  connected
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
+                    : 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
+                }`}
+              >
+                {connected ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
+                {connected ? 'Terhubung' : 'Terputus'}
+              </span>
+            )}
             <button
               onClick={toggle}
               className="rounded-xl p-2.5 text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"

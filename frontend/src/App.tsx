@@ -12,6 +12,7 @@ import ProductsPage from './pages/ProductsPage'
 import CashierPage from './pages/CashierPage'
 import TablesPage from './pages/TablesPage'
 import OrdersPage from './pages/OrdersPage'
+import KdsPage from './pages/KdsPage'
 
 export default function App() {
   const fetchMe = useAuthStore((s) => s.fetchMe)
@@ -100,7 +101,7 @@ export default function App() {
             path="/dapur"
             element={
               <RequirePermission code="order.view">
-                <PlaceholderPage title="Antrean Pesanan" description="Tiket pesanan untuk dapur dan bar." />
+                <KdsPage />
               </RequirePermission>
             }
           />

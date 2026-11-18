@@ -1,4 +1,5 @@
 import './config/env.js'
+import { createServer } from 'node:http'
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
@@ -8,6 +9,8 @@ import { authRouter } from './modules/auth/auth.routes.js'
 import { productsRouter } from './modules/products/products.routes.js'
 import { modifiersRouter } from './modules/products/modifiers.routes.js'
 import { posRouter } from './modules/pos/pos.routes.js'
+import { kdsRouter } from './modules/kds/kds.routes.js'
+import { initSocket } from './realtime/socket.js'
 import { requireAuth, requirePermission } from './middleware/auth.js'
 
 const app = express()
@@ -25,6 +28,7 @@ app.use('/api/auth', authRouter)
 app.use('/api', productsRouter)
 app.use('/api', modifiersRouter)
 app.use('/api', posRouter)
+app.use('/api', kdsRouter)
 
 app.get('/api/roles', requireAuth, requirePermission('user.manage'), async (_req, res) => {
   const roles = await prisma.role.findMany({
@@ -39,6 +43,10 @@ app.get('/api/reports/ping', requireAuth, requirePermission('report.view'), (_re
 
 const PORT = 4000
 
-app.listen(PORT, () => {
+// Socket.IO berbagi server HTTP yang sama dengan Express
+const httpServer = createServer(app)
+initSocket(httpServer)
+
+httpServer.listen(PORT, () => {
   console.log(`Backend berjalan di http://localhost:${PORT}`)
 })

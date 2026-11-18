@@ -18,6 +18,7 @@ model User {
   roles        UserRole[]
   orders       Order[]
   payments     Payment[]
+  statusLogs   OrderStatusLog[]
 }
 
 model Role {
@@ -197,6 +198,7 @@ model Order {
   updatedAt     DateTime         @updatedAt
   items         OrderItem[]
   payments      Payment[]
+  statusLogs    OrderStatusLog[]
 
   @@index([createdAt])
 }
@@ -249,6 +251,19 @@ model Payment {
   createdById    Int
   createdBy      User          @relation(fields: [createdById], references: [id])
   createdAt      DateTime      @default(now())
+
+  @@index([orderId])
+}
+
+model OrderStatusLog {
+  id         Int         @id @default(autoincrement())
+  orderId    Int
+  order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus OrderStatus
+  toStatus   OrderStatus
+  userId     Int
+  user       User        @relation(fields: [userId], references: [id])
+  createdAt  DateTime    @default(now())
 
   @@index([orderId])
 }
