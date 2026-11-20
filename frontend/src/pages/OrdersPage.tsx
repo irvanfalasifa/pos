@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Banknote, Check, Printer, Receipt as ReceiptIcon, Search } from 'lucide-react'
+import { Ban, Banknote, Check, Printer, Receipt as ReceiptIcon, RotateCcw, Search } from 'lucide-react'
 import { getOrders, getPosConfig } from '../services/pos'
 import type { Order, PaymentStatus } from '../services/pos'
 import { updateOrderStatus } from '../services/kds'
@@ -10,8 +10,10 @@ import { formatRupiah } from '../lib/format'
 import { orderStatusInfo, orderTypeLabel, paymentMethodLabel, paymentStatusInfo } from '../lib/labels'
 import PaymentModal from './orders/PaymentModal'
 import ReceiptModal from './orders/ReceiptModal'
+import CancelModal from './orders/CancelModal'
+import RefundModal from './orders/RefundModal'
 
-type Filter = 'ALL' | 'READY' | PaymentStatus
+type Filter = 'ALL' | 'READY' | 'REFUND' | 'CANCELLED' | PaymentStatus
 
 const filters: { value: Filter; label: string }[] = [
   { value: 'ALL', label: 'Semua' },
@@ -19,9 +21,14 @@ const filters: { value: Filter; label: string }[] = [
   { value: 'UNPAID', label: 'Belum bayar' },
   { value: 'PARTIALLY_PAID', label: 'Sebagian' },
   { value: 'PAID', label: 'Lunas' },
+  { value: 'REFUND', label: 'Refund' },
+  { value: 'CANCELLED', label: 'Dibatalkan' },
 ]
 
+const CANCELLABLE = ['PLACED', 'CONFIRMED', 'PREPARING', 'READY']
+
 const paidOf = (o: Order) => o.payments.reduce((sum, p) => sum + p.amount, 0)
+const refundedOf = (o: Order) => o.refunds.reduce((sum, r) => sum + r.amount, 0)
 
 export default function OrdersPage() {
   const user = useAuthStore((s) => s.user)
@@ -36,6 +43,8 @@ export default function OrdersPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filter, setFilter] = useState<Filter>('ALL')
   const [payTarget, setPayTarget] = useState<Order | null>(null)
+  const [cancelTarget, setCancelTarget] = useState<Order | null>(null)
+  const [refundTarget, setRefundTarget] = useState<Order | null>(null)
   const [receipt, setReceipt] = useState<{ order: Order; isCopy: boolean } | null>(null)
 
   useEffect(() => {
@@ -67,29 +76,33 @@ export default function OrdersPage() {
   const visible = orders.filter((o) => {
     if (filter === 'ALL') return true
     if (filter === 'READY') return o.status === 'READY'
+    if (filter === 'CANCELLED') return o.status === 'CANCELLED'
+    if (filter === 'REFUND') return o.refunds.length > 0
     return o.paymentStatus === filter
   })
 
-  const received = active.reduce((sum, o) => sum + paidOf(o), 0)
-  const outstanding = active.reduce((sum, o) => sum + (o.total - paidOf(o)), 0)
+  const received = orders.reduce((sum, o) => sum + paidOf(o) - refundedOf(o), 0)
+  const outstanding = active
+    .filter((o) => o.paymentStatus === 'UNPAID' || o.paymentStatus === 'PARTIALLY_PAID')
+    .reduce((sum, o) => sum + (o.total - paidOf(o)), 0)
 
   const chipBase = 'whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium transition'
   const chipOn = 'bg-amber-500 text-white shadow-md shadow-amber-500/30'
   const chipOff =
     'border border-slate-200 bg-white text-slate-600 hover:bg-amber-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+  const subtleButton =
+    'flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800'
 
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Transaksi</h1>
-        <p className="mt-1 text-slate-500 dark:text-slate-400">Riwayat pesanan, pembayaran, dan struk.</p>
+        <p className="mt-1 text-slate-500 dark:text-slate-400">Riwayat pesanan, pembayaran, refund, dan struk.</p>
       </div>
 
       {canServe && readyCount > 0 && filter !== 'READY' && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-sky-50 px-5 py-4 dark:bg-sky-500/10">
-          <p className="font-medium text-sky-800 dark:text-sky-300">
-            {readyCount} pesanan siap disajikan atau diambil
-          </p>
+          <p className="font-medium text-sky-800 dark:text-sky-300">{readyCount} pesanan siap disajikan atau diambil</p>
           <button
             onClick={() => setFilter('READY')}
             className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700 active:scale-[0.98]"
@@ -102,7 +115,7 @@ export default function OrdersPage() {
       <div className="grid gap-3 sm:grid-cols-3">
         {[
           { label: 'Jumlah pesanan', value: String(active.length) },
-          { label: 'Pembayaran diterima', value: formatRupiah(received) },
+          { label: 'Pembayaran diterima (bersih)', value: formatRupiah(received) },
           { label: 'Belum dibayar', value: formatRupiah(outstanding) },
         ].map((s) => (
           <div key={s.label} className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -133,11 +146,7 @@ export default function OrdersPage() {
 
       <div className="flex gap-2 overflow-x-auto pb-1">
         {filters.map((f) => (
-          <button
-            key={f.value}
-            onClick={() => setFilter(f.value)}
-            className={`${chipBase} ${filter === f.value ? chipOn : chipOff}`}
-          >
+          <button key={f.value} onClick={() => setFilter(f.value)} className={`${chipBase} ${filter === f.value ? chipOn : chipOff}`}>
             {f.label}
             {f.value === 'READY' && readyCount > 0 ? ` (${readyCount})` : ''}
           </button>
@@ -166,14 +175,25 @@ export default function OrdersPage() {
         <ul className="space-y-3">
           {visible.map((o) => {
             const paid = paidOf(o)
+            const refunded = refundedOf(o)
             const balance = o.total - paid
-            const canPayThis = canPay && o.paymentStatus !== 'PAID' && o.status !== 'CANCELLED'
+            const cancelled = o.status === 'CANCELLED'
+            const payable = o.paymentStatus === 'UNPAID' || o.paymentStatus === 'PARTIALLY_PAID'
+
+            const canPayThis = canPay && payable && !cancelled
+            const canCancelThis = canServe && CANCELLABLE.includes(o.status)
+            const canRefundThis = canPay && paid - refunded > 0
 
             return (
-              <li key={o.id} className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+              <li
+                key={o.id}
+                className={`rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 ${
+                  cancelled ? 'opacity-75' : ''
+                }`}
+              >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="font-bold text-slate-800 dark:text-white">{o.number}</p>
+                    <p className={`font-bold text-slate-800 dark:text-white ${cancelled ? 'line-through' : ''}`}>{o.number}</p>
                     <p className="text-sm text-slate-500 dark:text-slate-400">
                       {new Date(o.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} ·{' '}
                       {orderTypeLabel[o.type]}
@@ -212,10 +232,20 @@ export default function OrdersPage() {
                   </p>
                 )}
 
+                {o.refunds.length > 0 && (
+                  <p className="mt-1 text-sm text-sky-700 dark:text-sky-400">
+                    Direfund {formatRupiah(refunded)} · {o.refunds[o.refunds.length - 1].reason}
+                  </p>
+                )}
+
+                {cancelled && o.cancelReason && (
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">Dibatalkan: {o.cancelReason}</p>
+                )}
+
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-slate-800">
                   <div>
                     <p className="text-lg font-bold text-slate-800 dark:text-white">{formatRupiah(o.total)}</p>
-                    {balance > 0 && paid > 0 && (
+                    {payable && !cancelled && balance > 0 && paid > 0 && (
                       <p className="text-xs text-rose-600 dark:text-rose-400">Sisa {formatRupiah(balance)}</p>
                     )}
                   </div>
@@ -231,10 +261,22 @@ export default function OrdersPage() {
                         {o.type === 'DINE_IN' ? 'Sudah disajikan' : 'Sudah diambil'}
                       </button>
                     )}
-                    <button
-                      onClick={() => setReceipt({ order: o, isCopy: o.paymentStatus === 'PAID' })}
-                      className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                    >
+                    {canCancelThis && (
+                      <button
+                        onClick={() => setCancelTarget(o)}
+                        className="flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 dark:border-red-500/40 dark:hover:bg-red-500/10"
+                      >
+                        <Ban className="h-4 w-4" />
+                        Batalkan
+                      </button>
+                    )}
+                    {canRefundThis && (
+                      <button onClick={() => setRefundTarget(o)} className={subtleButton}>
+                        <RotateCcw className="h-4 w-4" />
+                        Refund
+                      </button>
+                    )}
+                    <button onClick={() => setReceipt({ order: o, isCopy: o.paymentStatus === 'PAID' })} className={subtleButton}>
                       <Printer className="h-4 w-4" />
                       {o.paymentStatus === 'PAID' ? 'Struk' : 'Tagihan'}
                     </button>
@@ -266,13 +308,11 @@ export default function OrdersPage() {
         />
       )}
 
+      {cancelTarget && <CancelModal order={cancelTarget} onClose={() => setCancelTarget(null)} />}
+      {refundTarget && <RefundModal order={refundTarget} onClose={() => setRefundTarget(null)} />}
+
       {receipt && (
-        <ReceiptModal
-          order={receipt.order}
-          config={configQuery.data}
-          isCopy={receipt.isCopy}
-          onClose={() => setReceipt(null)}
-        />
+        <ReceiptModal order={receipt.order} config={configQuery.data} isCopy={receipt.isCopy} onClose={() => setReceipt(null)} />
       )}
     </div>
   )

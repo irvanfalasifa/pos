@@ -27,6 +27,7 @@ export default function Receipt({
 }) {
   const paid = order.payments.reduce((sum, p) => sum + p.amount, 0)
   const balance = order.total - paid
+  const refunded = order.refunds.reduce((sum, r) => sum + r.amount, 0)
 
   return (
     <div className="mx-auto w-full max-w-xs bg-white p-4 font-mono text-xs leading-snug text-black print:max-w-none print:p-0">
@@ -70,7 +71,7 @@ export default function Receipt({
 
       <Divider />
       {order.payments.length === 0 ? (
-        <p className="text-center font-bold">BELUM DIBAYAR</p>
+        <p className="text-center font-bold">{order.status === 'CANCELLED' ? 'DIBATALKAN' : 'BELUM DIBAYAR'}</p>
       ) : (
         <>
           {order.payments.map((p) => (
@@ -85,7 +86,19 @@ export default function Receipt({
               {p.reference && <div className="pl-2">Ref: {p.reference}</div>}
             </div>
           ))}
-          {balance > 0 ? (
+                    {order.refunds.length > 0 && (
+            <div className="mt-1">
+              {order.refunds.map((r) => (
+                <Row key={r.id} left="Refund" right={`-${formatRupiah(r.amount)}`} />
+              ))}
+              <Row left="Dibayar bersih" right={formatRupiah(paid - refunded)} bold />
+            </div>
+          )}
+          {order.status === 'CANCELLED' ? (
+            <p className="mt-1 text-center font-bold">DIBATALKAN</p>
+          ) : order.refunds.length > 0 ? (
+            <p className="mt-1 text-center font-bold">{paid - refunded <= 0 ? 'REFUND PENUH' : 'REFUND SEBAGIAN'}</p>
+          ) : balance > 0 ? (
             <Row left="SISA TAGIHAN" right={formatRupiah(balance)} bold />
           ) : (
             <p className="mt-1 text-center font-bold">LUNAS</p>

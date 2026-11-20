@@ -13,6 +13,7 @@ import CashierPage from './pages/CashierPage'
 import TablesPage from './pages/TablesPage'
 import OrdersPage from './pages/OrdersPage'
 import KdsPage from './pages/KdsPage'
+import AuditPage from './pages/AuditPage'
 
 export default function App() {
   const fetchMe = useAuthStore((s) => s.fetchMe)
@@ -58,6 +59,14 @@ export default function App() {
             element={
               <RequirePermission code="user.manage">
                 <PlaceholderPage title="Pengguna" description="Kelola akun, role, dan izin." />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/manajemen/audit"
+            element={
+              <RequirePermission code="audit.view">
+                <AuditPage />
               </RequirePermission>
             }
           />

@@ -68,6 +68,9 @@ export type Order = {
   createdAt: string
   items: OrderItem[]
   payments: Payment[]
+  refunds: Refund[]
+  cancelReason: string | null
+  cancelledAt: string | null
 }
 
 export type OrderInput = {
@@ -123,3 +126,28 @@ export type PaymentInput = {
 
 export const payOrder = (orderId: number, data: PaymentInput) =>
   api<Order>(`/orders/${orderId}/payments`, { method: 'POST', body: JSON.stringify(data) })
+
+export type Refund = {
+  id: number
+  paymentId: number
+  amount: number
+  reason: string
+  createdAt: string
+}
+
+export type Approver = { email: string; password: string }
+
+export const cancelOrder = (id: number, data: { reason: string; approver: Approver | null }) =>
+  api<{ id: number; number: string; status: OrderStatus; refunded: number }>(`/orders/${id}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+
+export const refundOrder = (
+  id: number,
+  data: { reason: string; refunds: { paymentId: number; amount: number }[]; approver: Approver | null },
+) =>
+  api<{ id: number; number: string; total: number; paymentStatus: PaymentStatus }>(`/orders/${id}/refunds`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })

@@ -29,7 +29,7 @@ async function getRates() {
   return { taxBp: read('tax_bp'), serviceBp: read('service_bp') }
 }
 
-const orderInclude = {
+export const orderInclude = {
   table: { select: { id: true, name: true } },
   createdBy: { select: { id: true, name: true } },
   items: { include: { modifiers: true }, orderBy: { id: 'asc' } },
@@ -43,6 +43,10 @@ const orderInclude = {
       reference: true,
       createdAt: true,
     },
+    orderBy: { id: 'asc' },
+  },
+  refunds: {
+    select: { id: true, paymentId: true, amount: true, reason: true, createdAt: true },
     orderBy: { id: 'asc' },
   },
 } as const
@@ -360,6 +364,9 @@ async function payOrder(orderId: number, input: PaymentInput, userId: number) {
           const order = await tx.order.findUnique({ where: { id: orderId }, include: { payments: true } })
           if (!order) throw new PaymentError('Pesanan tidak ditemukan', 404)
           if (order.status === 'CANCELLED') throw new PaymentError('Pesanan sudah dibatalkan')
+          if (order.paymentStatus === 'REFUNDED' || order.paymentStatus === 'PARTIALLY_REFUNDED') {
+          throw new PaymentError('Pesanan ini sudah direfund dan tidak bisa dibayar lagi')
+          }
 
           const paid = order.payments.reduce((sum, p) => sum + p.amount, 0)
           const balance = order.total - paid

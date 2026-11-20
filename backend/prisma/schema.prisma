@@ -19,6 +19,9 @@ model User {
   orders       Order[]
   payments     Payment[]
   statusLogs   OrderStatusLog[]
+  auditLogs    AuditLog[]
+  refundsCreated  Refund[] @relation("RefundCreatedBy")
+  refundsApproved Refund[] @relation("RefundApprovedBy")
 }
 
 model Role {
@@ -199,6 +202,9 @@ model Order {
   items         OrderItem[]
   payments      Payment[]
   statusLogs    OrderStatusLog[]
+  refunds       Refund[]
+  cancelReason  String?
+  cancelledAt   DateTime?
 
   @@index([createdAt])
 }
@@ -251,6 +257,7 @@ model Payment {
   createdById    Int
   createdBy      User          @relation(fields: [createdById], references: [id])
   createdAt      DateTime      @default(now())
+  refunds        Refund[]
 
   @@index([orderId])
 }
@@ -266,4 +273,39 @@ model OrderStatusLog {
   createdAt  DateTime    @default(now())
 
   @@index([orderId])
+}
+
+model Refund {
+  id           Int      @id @default(autoincrement())
+  paymentId    Int
+  payment      Payment  @relation(fields: [paymentId], references: [id])
+  orderId      Int
+  order        Order    @relation(fields: [orderId], references: [id])
+  amount       Int
+  reason       String
+  approvedById Int
+  approvedBy   User     @relation("RefundApprovedBy", fields: [approvedById], references: [id])
+  createdById  Int
+  createdBy    User     @relation("RefundCreatedBy", fields: [createdById], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([orderId])
+  @@index([paymentId])
+}
+
+model AuditLog {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  user         User     @relation(fields: [userId], references: [id])
+  action       String
+  entityType   String
+  entityId     Int
+  beforeData   Json?
+  afterData    Json?
+  reason       String?
+  approvedById Int?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
 }

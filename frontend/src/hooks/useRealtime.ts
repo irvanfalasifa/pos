@@ -9,7 +9,7 @@ type OrdersChangedEvent = {
   id: number
   number: string
   status: string
-  reason: 'created' | 'status' | 'paid'
+  reason: 'created' | 'status' | 'paid' | 'cancelled' | 'refunded'
 }
 
 export function useRealtime(enabled: boolean) {
@@ -37,9 +37,17 @@ export function useRealtime(enabled: boolean) {
     const onOrdersChanged = (event: OrdersChangedEvent) => {
       refresh()
 
-      const canServe = useAuthStore.getState().user?.permissions.includes('order.create')
-      if (event.reason === 'status' && event.status === 'READY' && canServe) {
-        useToastStore.getState().push('success', `Pesanan ${event.number} siap disajikan`)
+      const permissions = useAuthStore.getState().user?.permissions ?? []
+      const push = useToastStore.getState().push
+
+      if (event.reason === 'status' && event.status === 'READY' && permissions.includes('order.create')) {
+        push('success', `Pesanan ${event.number} siap disajikan`)
+      }
+      if (
+        event.reason === 'cancelled' &&
+        (permissions.includes('kds.update') || permissions.includes('order.create'))
+      ) {
+        push('error', `Pesanan ${event.number} dibatalkan`)
       }
     }
 

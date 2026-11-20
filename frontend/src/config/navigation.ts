@@ -8,6 +8,7 @@ import {
   LayoutGrid,
   Receipt,
   ChefHat,
+  ShieldCheck,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { AuthUser } from '../stores/authStore'
@@ -44,6 +45,7 @@ export const workspaces: Workspace[] = [
       { label: 'Inventori', path: '/manajemen/inventori', icon: Boxes, permission: 'product.view' },
       { label: 'Laporan', path: '/manajemen/laporan', icon: TrendingUp, permission: 'report.view' },
       { label: 'Pengguna', path: '/manajemen/pengguna', icon: Users, permission: 'user.manage' },
+      { label: 'Audit Log', path: '/manajemen/audit', icon: ShieldCheck, permission: 'audit.view' },
     ],
   },
   {

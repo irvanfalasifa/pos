@@ -11,7 +11,7 @@ export type OrderEvent = {
   id: number
   number: string
   status: string
-  reason: 'created' | 'status' | 'paid'
+  reason: 'created' | 'status' | 'paid' | 'cancelled' | 'refunded'
 }
 
 function readCookie(header: string | undefined, name: string): string | null {
