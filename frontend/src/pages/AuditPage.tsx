@@ -17,6 +17,10 @@ const actionInfo: Record<string, { label: string; className: string }> = {
     label: 'Otorisasi gagal',
     className: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
   },
+    SETTINGS_UPDATED: {
+    label: 'Pengaturan diubah',
+    className: 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-400',
+  },
 }
 
 const filters = [
@@ -24,9 +28,11 @@ const filters = [
   { value: 'ORDER_CANCELLED', label: 'Pembatalan' },
   { value: 'PAYMENT_REFUNDED', label: 'Refund' },
   { value: 'APPROVAL_FAILED', label: 'Otorisasi gagal' },
+  { value: 'SETTINGS_UPDATED', label: 'Pengaturan' },
 ]
 
 function entityLabel(log: AuditLog): string {
+  if (log.entityType === 'Settings') return 'Pengaturan usaha'
   const data = log.afterData ?? log.beforeData
   const number = data?.number
   return typeof number === 'string' ? number : `#${log.entityId}`

@@ -43,7 +43,10 @@ export default function CashierPage() {
   }, [productsQuery.data, categoriesQuery.data, search, categoryId])
 
   const itemCount = lines.reduce((sum, l) => sum + l.quantity, 0)
-  const totals = calcTotals(cartSubtotal(lines), configQuery.data?.taxBp ?? 0, configQuery.data?.serviceBp ?? 0)
+  const totals = calcTotals(cartSubtotal(lines), configQuery.data?.taxBp ?? 0, configQuery.data?.serviceBp ?? 0, {
+    taxBase: configQuery.data?.taxBase,
+    roundingStep: configQuery.data?.roundingStep,
+  })
 
   function handlePick(p: Product) {
     const hasOptions =

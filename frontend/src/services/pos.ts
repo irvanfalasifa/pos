@@ -33,9 +33,13 @@ export type Area = { id: number; name: string; tables: RestaurantTable[] }
 export type PosConfig = {
   taxBp: number
   serviceBp: number
+  taxBase: 'SUBTOTAL' | 'SUBTOTAL_PLUS_SERVICE'
+  roundingStep: number
   businessName: string
   businessAddress: string
+  businessPhone: string
   receiptFooter: string
+  receiptPaper: '58' | '80'
 }
 
 export type OrderItem = {
@@ -63,6 +67,7 @@ export type Order = {
   serviceAmount: number
   taxBp: number
   taxAmount: number
+  roundingAmount: number
   total: number
   createdBy: { id: number; name: string }
   createdAt: string

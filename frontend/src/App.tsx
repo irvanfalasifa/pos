@@ -14,6 +14,8 @@ import TablesPage from './pages/TablesPage'
 import OrdersPage from './pages/OrdersPage'
 import KdsPage from './pages/KdsPage'
 import AuditPage from './pages/AuditPage'
+import SettingsPage from './pages/SettingsPage'
+import TablesAdminPage from './pages/TablesAdminPage'
 
 export default function App() {
   const fetchMe = useAuthStore((s) => s.fetchMe)
@@ -67,6 +69,22 @@ export default function App() {
             element={
               <RequirePermission code="audit.view">
                 <AuditPage />
+              </RequirePermission>
+            }
+          />
+                    <Route
+            path="/manajemen/meja"
+            element={
+              <RequirePermission code="table.manage">
+                <TablesAdminPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/manajemen/pengaturan"
+            element={
+              <RequirePermission code="settings.manage">
+                <SettingsPage />
               </RequirePermission>
             }
           />

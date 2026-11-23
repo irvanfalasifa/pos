@@ -28,13 +28,19 @@ export default function Receipt({
   const paid = order.payments.reduce((sum, p) => sum + p.amount, 0)
   const balance = order.total - paid
   const refunded = order.refunds.reduce((sum, r) => sum + r.amount, 0)
+  const narrow = config?.receiptPaper === '58'
 
   return (
-    <div className="mx-auto w-full max-w-xs bg-white p-4 font-mono text-xs leading-snug text-black print:max-w-none print:p-0">
+    <div
+      className={`mx-auto w-full bg-white p-4 font-mono leading-snug text-black print:max-w-none print:p-0 ${
+        narrow ? 'max-w-52 text-[10px] print:w-[48mm]' : 'max-w-xs text-xs print:w-[72mm]'
+      }`}
+    >
       {isCopy && <p className="mb-2 text-center font-bold">*** SALINAN ***</p>}
 
       <p className="text-center text-sm font-bold">{config?.businessName ?? 'POS Restoran'}</p>
       {config?.businessAddress && <p className="text-center">{config.businessAddress}</p>}
+      {config?.businessPhone && <p className="text-center">Telp {config.businessPhone}</p>}
 
       <Divider />
       <Row left="No" right={order.number} />
@@ -67,6 +73,7 @@ export default function Receipt({
         <Row left={`Service (${formatPercent(order.serviceBp)})`} right={formatRupiah(order.serviceAmount)} />
       )}
       {order.taxAmount > 0 && <Row left={`Pajak (${formatPercent(order.taxBp)})`} right={formatRupiah(order.taxAmount)} />}
+      {order.roundingAmount !== 0 && <Row left="Pembulatan" right={formatRupiah(order.roundingAmount)} />}
       <Row left="TOTAL" right={formatRupiah(order.total)} bold />
 
       <Divider />
@@ -86,7 +93,8 @@ export default function Receipt({
               {p.reference && <div className="pl-2">Ref: {p.reference}</div>}
             </div>
           ))}
-                    {order.refunds.length > 0 && (
+
+          {order.refunds.length > 0 && (
             <div className="mt-1">
               {order.refunds.map((r) => (
                 <Row key={r.id} left="Refund" right={`-${formatRupiah(r.amount)}`} />
@@ -94,6 +102,7 @@ export default function Receipt({
               <Row left="Dibayar bersih" right={formatRupiah(paid - refunded)} bold />
             </div>
           )}
+
           {order.status === 'CANCELLED' ? (
             <p className="mt-1 text-center font-bold">DIBATALKAN</p>
           ) : order.refunds.length > 0 ? (

@@ -39,7 +39,10 @@ export default function CartPanel({ onSubmitted }: { onSubmitted?: () => void })
 
   const taxBp = configQuery.data?.taxBp ?? 0
   const serviceBp = configQuery.data?.serviceBp ?? 0
-  const totals = calcTotals(cartSubtotal(lines), taxBp, serviceBp)
+  const totals = calcTotals(cartSubtotal(lines), taxBp, serviceBp, {
+    taxBase: configQuery.data?.taxBase,
+    roundingStep: configQuery.data?.roundingStep,
+  })
   const areas = tablesQuery.data ?? []
 
   const mutation = useMutation({
@@ -210,6 +213,12 @@ export default function CartPanel({ onSubmitted }: { onSubmitted?: () => void })
                 <div className="flex justify-between text-slate-600 dark:text-slate-300">
                   <dt>Pajak ({formatPercent(taxBp)})</dt>
                   <dd>{formatRupiah(totals.tax)}</dd>
+                </div>
+              )}
+              {totals.rounding !== 0 && (
+                <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                  <dt>Pembulatan</dt>
+                  <dd>{formatRupiah(totals.rounding)}</dd>
                 </div>
               )}
               <div className="flex justify-between border-t border-slate-200 pt-2 text-base font-bold text-slate-800 dark:border-slate-800 dark:text-white">
