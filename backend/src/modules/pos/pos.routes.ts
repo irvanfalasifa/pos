@@ -4,6 +4,7 @@ import { prisma } from '../../lib/prisma.js'
 import { requireAuth, requirePermission } from '../../middleware/auth.js'
 import type { AuthUser } from '../../middleware/auth.js'
 import { emitOrdersChanged, emitTablesChanged } from '../../realtime/socket.js'
+import { getSettings } from '../settings/settings.service.js'
 
 export const posRouter = Router()
 
@@ -21,12 +22,8 @@ function parseId(value: unknown): number | null {
 }
 
 async function getRates() {
-  const rows = await prisma.setting.findMany({ where: { key: { in: ['tax_bp', 'service_bp'] } } })
-  const read = (key: string) => {
-    const n = Number(rows.find((r) => r.key === key)?.value)
-    return Number.isInteger(n) && n >= 0 ? n : 0
-  }
-  return { taxBp: read('tax_bp'), serviceBp: read('service_bp') }
+  const s = await getSettings()
+  return { taxBp: s.taxBp, serviceBp: s.serviceBp, taxBase: s.taxBase, roundingStep: s.roundingStep }
 }
 
 export const orderInclude = {
@@ -54,14 +51,13 @@ export const orderInclude = {
 /* ---------------- Konfigurasi ---------------- */
 
 async function getBusiness() {
-  const rows = await prisma.setting.findMany({
-    where: { key: { in: ['business_name', 'business_address', 'receipt_footer'] } },
-  })
-  const read = (key: string, fallback: string) => rows.find((r) => r.key === key)?.value ?? fallback
+  const s = await getSettings()
   return {
-    businessName: read('business_name', 'POS Restoran'),
-    businessAddress: read('business_address', ''),
-    receiptFooter: read('receipt_footer', 'Terima kasih atas kunjungan Anda'),
+    businessName: s.businessName,
+    businessAddress: s.businessAddress,
+    businessPhone: s.businessPhone,
+    receiptFooter: s.receiptFooter,
+    receiptPaper: s.receiptPaper,
   }
 }
 
@@ -199,11 +195,15 @@ async function createOrder(input: OrderInput, userId: number) {
   }
 
   // 4. Hitung total (tarif disimpan sebagai snapshot di pesanan)
-  const { taxBp, serviceBp } = await getRates()
+  const { taxBp, serviceBp, taxBase, roundingStep } = await getRates()
   const subtotal = lines.reduce((sum, l) => sum + l.lineTotal, 0)
   const serviceAmount = Math.round((subtotal * serviceBp) / 10000)
-  const taxAmount = Math.round(((subtotal + serviceAmount) * taxBp) / 10000)
-  const total = subtotal + serviceAmount + taxAmount
+  const taxable = taxBase === 'SUBTOTAL' ? subtotal : subtotal + serviceAmount
+  const taxAmount = Math.round((taxable * taxBp) / 10000)
+  const beforeRounding = subtotal + serviceAmount + taxAmount
+  const roundingAmount =
+    roundingStep > 0 ? Math.round(beforeRounding / roundingStep) * roundingStep - beforeRounding : 0
+  const total = beforeRounding + roundingAmount
 
   // 5. Simpan. Nomor pesanan dicoba ulang bila bentrok dengan permintaan lain.
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -229,6 +229,7 @@ async function createOrder(input: OrderInput, userId: number) {
             taxBp,
             taxAmount,
             total,
+            roundingAmount,
             createdById: userId,
             items: {
               create: lines.map((l) => ({

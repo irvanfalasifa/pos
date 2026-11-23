@@ -194,6 +194,7 @@ model Order {
   serviceAmount Int
   taxBp         Int
   taxAmount     Int
+  roundingAmount Int @default(0)
   total         Int
   createdById   Int
   createdBy     User             @relation(fields: [createdById], references: [id])

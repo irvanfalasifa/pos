@@ -14,6 +14,8 @@ import { initSocket } from './realtime/socket.js'
 import { requireAuth, requirePermission } from './middleware/auth.js'
 import { orderActionsRouter } from './modules/pos/orderActions.routes.js'
 import { auditRouter } from './modules/audit/audit.routes.js'
+import { settingsRouter } from './modules/settings/settings.routes.js'
+import { tablesAdminRouter } from './modules/pos/tablesAdmin.routes.js'
 
 const app = express()
 
@@ -33,6 +35,8 @@ app.use('/api', posRouter)
 app.use('/api', kdsRouter)
 app.use('/api', orderActionsRouter)
 app.use('/api', auditRouter)
+app.use('/api', settingsRouter)
+app.use('/api', tablesAdminRouter)
 
 app.get('/api/roles', requireAuth, requirePermission('user.manage'), async (_req, res) => {
   const roles = await prisma.role.findMany({
