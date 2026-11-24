@@ -22,6 +22,8 @@ model User {
   auditLogs    AuditLog[]
   refundsCreated  Refund[] @relation("RefundCreatedBy")
   refundsApproved Refund[] @relation("RefundApprovedBy")
+  tokenVersion       Int     @default(0)
+  mustChangePassword Boolean @default(false)
 }
 
 model Role {
@@ -309,4 +311,17 @@ model AuditLog {
 
   @@index([createdAt])
   @@index([action])
+}
+
+model LoginEvent {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  email     String
+  success   Boolean
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+  @@index([userId])
 }

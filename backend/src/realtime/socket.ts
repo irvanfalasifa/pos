@@ -36,6 +36,7 @@ export function initSocket(httpServer: HttpServer) {
 
       const payload = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload
       const user = await loadUser(Number(payload.sub))
+      if (user && payload.tv !== user.tokenVersion) return next(new Error('Sesi berakhir'))
       if (!user || !user.permissions.includes('order.view')) {
         return next(new Error('Tidak punya izin'))
       }
