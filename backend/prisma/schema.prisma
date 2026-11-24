@@ -24,6 +24,7 @@ model User {
   refundsApproved Refund[] @relation("RefundApprovedBy")
   tokenVersion       Int     @default(0)
   mustChangePassword Boolean @default(false)
+  deletedAt DateTime?
 }
 
 model Role {

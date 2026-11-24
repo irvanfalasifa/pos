@@ -21,6 +21,30 @@ const actionInfo: Record<string, { label: string; className: string }> = {
     label: 'Pengaturan diubah',
     className: 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-400',
   },
+    USER_CREATED: {
+    label: 'Akun dibuat',
+    className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400',
+  },
+  USER_UPDATED: {
+    label: 'Akun diubah',
+    className: 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400',
+  },
+  PASSWORD_RESET: {
+    label: 'Password direset',
+    className: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
+  },
+  PASSWORD_CHANGED: {
+    label: 'Password diganti',
+    className: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
+  },
+  ROLE_PERMISSIONS_UPDATED: {
+    label: 'Izin role diubah',
+    className: 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-400',
+  },
+    USER_DELETED: {
+    label: 'Akun dihapus',
+    className: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400',
+  },
 }
 
 const filters = [
@@ -32,6 +56,10 @@ const filters = [
 ]
 
 function entityLabel(log: AuditLog): string {
+    if (log.entityType === 'User' || log.entityType === 'Role') {
+    const name = (log.afterData ?? log.beforeData)?.name
+    if (typeof name === 'string') return name
+  }
   if (log.entityType === 'Settings') return 'Pengaturan usaha'
   const data = log.afterData ?? log.beforeData
   const number = data?.number

@@ -7,6 +7,7 @@ export type AuthUser = {
   email: string
   roles: string[]
   permissions: string[]
+  mustChangePassword: boolean
 }
 
 type AuthState = {

@@ -16,6 +16,9 @@ import KdsPage from './pages/KdsPage'
 import AuditPage from './pages/AuditPage'
 import SettingsPage from './pages/SettingsPage'
 import TablesAdminPage from './pages/TablesAdminPage'
+import UsersPage from './pages/UsersPage'
+import RolesPage from './pages/RolesPage'
+import { useToastStore } from './stores/toastStore'
 
 export default function App() {
   const fetchMe = useAuthStore((s) => s.fetchMe)
@@ -23,6 +26,18 @@ export default function App() {
   useEffect(() => {
     fetchMe()
   }, [fetchMe])
+
+    // Sesi berakhir (token dicabut, akun dinonaktifkan, atau password diganti di perangkat lain)
+  useEffect(() => {
+    const onExpired = () => {
+      if (useAuthStore.getState().user) {
+        useAuthStore.setState({ user: null })
+        useToastStore.getState().push('error', 'Sesi Anda berakhir, silakan masuk kembali')
+      }
+    }
+    window.addEventListener('auth:expired', onExpired)
+    return () => window.removeEventListener('auth:expired', onExpired)
+  }, [])
 
   return (
     <Routes>
@@ -60,7 +75,15 @@ export default function App() {
             path="/manajemen/pengguna"
             element={
               <RequirePermission code="user.manage">
-                <PlaceholderPage title="Pengguna" description="Kelola akun, role, dan izin." />
+                <UsersPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/manajemen/role"
+            element={
+              <RequirePermission code="role.manage">
+                <RolesPage />
               </RequirePermission>
             }
           />

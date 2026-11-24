@@ -12,6 +12,7 @@ import {
   ChevronDown,
   Wifi,
   WifiOff,
+  KeyRound,
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { useThemeStore } from '../stores/themeStore'
@@ -19,6 +20,7 @@ import { workspaces, accessibleWorkspaces, visibleItems } from '../config/naviga
 import type { NavItem, Workspace, WorkspaceKey } from '../config/navigation'
 import { useRealtime } from '../hooks/useRealtime'
 import { useRealtimeStore } from '../stores/realtimeStore'
+import AccountModal from './AccountModal'
 
 type SidebarProps = {
   workspace: Workspace
@@ -104,6 +106,7 @@ export default function AppLayout({ workspace }: { workspace: WorkspaceKey }) {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
   const connected = useRealtimeStore((s) => s.connected)
   useRealtime(!!user?.permissions.includes('order.view'))
 
@@ -220,6 +223,16 @@ export default function AppLayout({ workspace }: { workspace: WorkspaceKey }) {
                       <p className="truncate text-xs text-slate-500 dark:text-slate-400">{user.email}</p>
                     </div>
                     <button
+                      onClick={() => {
+                        setMenuOpen(false)
+                        setAccountOpen(true)
+                      }}
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                      <KeyRound className="h-4 w-4" />
+                      Akun saya
+                    </button>
+                    <button
                       onClick={logout}
                       className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-red-600 transition hover:bg-red-50 dark:hover:bg-red-500/10"
                     >
@@ -236,6 +249,7 @@ export default function AppLayout({ workspace }: { workspace: WorkspaceKey }) {
         <main className="p-4 sm:p-6">
           <Outlet />
         </main>
+          {accountOpen && <AccountModal onClose={() => setAccountOpen(false)} />}
       </div>
     </div>
   )

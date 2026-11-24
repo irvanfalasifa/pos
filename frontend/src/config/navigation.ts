@@ -10,6 +10,7 @@ import {
   ChefHat,
   ShieldCheck,
   Settings,
+  KeyRound,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { AuthUser } from '../stores/authStore'
@@ -46,6 +47,7 @@ export const workspaces: Workspace[] = [
       { label: 'Inventori', path: '/manajemen/inventori', icon: Boxes, permission: 'product.view' },
       { label: 'Laporan', path: '/manajemen/laporan', icon: TrendingUp, permission: 'report.view' },
       { label: 'Pengguna', path: '/manajemen/pengguna', icon: Users, permission: 'user.manage' },
+      { label: 'Role & Izin', path: '/manajemen/role', icon: KeyRound, permission: 'role.manage' },
       { label: 'Audit Log', path: '/manajemen/audit', icon: ShieldCheck, permission: 'audit.view' },
       { label: 'Kelola Meja', path: '/manajemen/meja', icon: LayoutGrid, permission: 'table.manage' },
       { label: 'Pengaturan', path: '/manajemen/pengaturan', icon: Settings, permission: 'settings.manage' },

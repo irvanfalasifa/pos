@@ -99,7 +99,11 @@ function sendError(e: unknown, res: Response) {
 /* ---------------- Daftar pengguna ---------------- */
 
 usersRouter.get('/admin/users', ...userGuard, async (_req, res) => {
-  const users = await prisma.user.findMany({ orderBy: { id: 'asc' }, include: userInclude })
+    const users = await prisma.user.findMany({
+    where: { deletedAt: null },
+    orderBy: { id: 'asc' },
+    include: userInclude,
+  })
 
   const logins = await prisma.loginEvent.groupBy({
     by: ['userId'],
@@ -398,4 +402,74 @@ usersRouter.put('/admin/roles/:id/permissions', ...roleGuard, async (req, res) =
   })
 
   res.json({ id, codes })
+})
+
+/* ---------------- Hapus akun ---------------- */
+
+usersRouter.delete('/admin/users/:id', ...userGuard, async (req, res) => {
+  const id = parseId(req.params.id)
+  if (!id) return res.status(400).json({ message: 'ID tidak valid' })
+
+  const actor = res.locals.user as AuthUser
+
+  try {
+    if (id === actor.id) throw new UserError('Anda tidak dapat menghapus akun sendiri')
+
+    const target = await prisma.user.findFirst({ where: { id, deletedAt: null }, include: userInclude })
+    if (!target) throw new UserError('Pengguna tidak ditemukan', 404)
+
+    const targetRoles = target.roles.map((r) => r.role.name)
+    assertCanManage(actor, targetRoles)
+
+    // Harus selalu ada minimal satu Owner aktif
+    if (targetRoles.includes('owner')) {
+      const otherOwners = await prisma.user.count({
+        where: { id: { not: id }, isActive: true, roles: { some: { role: { name: 'owner' } } } },
+      })
+      if (otherOwners === 0) throw new UserError('Harus ada minimal satu Owner yang aktif')
+    }
+
+    // Apakah akun ini pernah meninggalkan jejak di data lain?
+    const [orders, payments, refunds, statusLogs, audits] = await Promise.all([
+      prisma.order.count({ where: { createdById: id } }),
+      prisma.payment.count({ where: { createdById: id } }),
+      prisma.refund.count({ where: { OR: [{ createdById: id }, { approvedById: id }] } }),
+      prisma.orderStatusLog.count({ where: { userId: id } }),
+      prisma.auditLog.count({ where: { OR: [{ userId: id }, { approvedById: id }] } }),
+    ])
+    const hasHistory = orders + payments + refunds + statusLogs + audits > 0
+
+    await prisma.$transaction(async (tx) => {
+      if (hasHistory) {
+        // Diarsipkan: riwayat tetap utuh, email dibebaskan, semua sesi berakhir
+        await tx.user.update({
+          where: { id },
+          data: {
+            isActive: false,
+            deletedAt: new Date(),
+            email: `arsip-${id}-${target.email}`,
+            tokenVersion: { increment: 1 },
+          },
+        })
+      } else {
+        await tx.loginEvent.deleteMany({ where: { userId: id } })
+        await tx.user.delete({ where: { id } })
+      }
+
+      await tx.auditLog.create({
+        data: auditData({
+          userId: actor.id,
+          action: 'USER_DELETED',
+          entityType: 'User',
+          entityId: id,
+          beforeData: { name: target.name, email: target.email, roles: targetRoles },
+          afterData: { name: target.name, mode: hasHistory ? 'archived' : 'deleted' },
+        }),
+      })
+    })
+
+    res.json({ id, mode: hasHistory ? 'archived' : 'deleted' })
+  } catch (e) {
+    return sendError(e, res)
+  }
 })
