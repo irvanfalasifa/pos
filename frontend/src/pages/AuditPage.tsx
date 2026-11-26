@@ -45,6 +45,18 @@ const actionInfo: Record<string, { label: string; className: string }> = {
     label: 'Akun dihapus',
     className: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400',
   },
+  CASH_OUT_RECORDED: {
+    label: 'Kas keluar',
+    className: 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400',
+  },
+  SHIFT_CLOSED: {
+    label: 'Shift ditutup',
+    className: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
+  },
+  SHIFT_REVIEWED: {
+    label: 'Shift disahkan',
+    className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400',
+  },
 }
 
 const filters = [
@@ -56,6 +68,7 @@ const filters = [
 ]
 
 function entityLabel(log: AuditLog): string {
+    if (log.entityType === 'Shift') return `Shift #${log.entityId}`
     if (log.entityType === 'User' || log.entityType === 'Role') {
     const name = (log.afterData ?? log.beforeData)?.name
     if (typeof name === 'string') return name

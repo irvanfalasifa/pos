@@ -90,6 +90,14 @@ export default function App() {
             }
           />
           <Route
+            path="/manajemen/shift"
+            element={
+              <RequirePermission code="shift.review">
+                <ShiftsAdminPage />
+              </RequirePermission>
+            }
+          />
+          <Route
             path="/manajemen/audit"
             element={
               <RequirePermission code="audit.view">

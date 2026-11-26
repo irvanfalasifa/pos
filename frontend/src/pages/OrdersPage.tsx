@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ban, Banknote, Check, Printer, Receipt as ReceiptIcon, RotateCcw, Search } from 'lucide-react'
 import { getOrders, getPosConfig } from '../services/pos'
+import { Link } from 'react-router-dom'
+import { getCurrentShift } from '../services/shifts'
 import type { Order, PaymentStatus } from '../services/pos'
 import { updateOrderStatus } from '../services/kds'
 import { useAuthStore } from '../stores/authStore'
@@ -12,6 +14,7 @@ import PaymentModal from './orders/PaymentModal'
 import ReceiptModal from './orders/ReceiptModal'
 import CancelModal from './orders/CancelModal'
 import RefundModal from './orders/RefundModal'
+
 
 type Filter = 'ALL' | 'READY' | 'REFUND' | 'CANCELLED' | PaymentStatus
 
@@ -58,6 +61,13 @@ export default function OrdersPage() {
     refetchInterval: 20_000,
   })
   const configQuery = useQuery({ queryKey: ['pos-config'], queryFn: getPosConfig })
+  const shiftQuery = useQuery({
+    queryKey: ['shift-current'],
+    queryFn: getCurrentShift,
+    enabled: canPay,
+    retry: false,
+  })
+  const noShift = canPay && shiftQuery.isSuccess && shiftQuery.data.shift === null
 
   const serveMutation = useMutation({
     mutationFn: (id: number) => updateOrderStatus(id, 'SERVED'),
@@ -100,6 +110,20 @@ export default function OrdersPage() {
         <p className="mt-1 text-slate-500 dark:text-slate-400">Riwayat pesanan, pembayaran, refund, dan struk.</p>
       </div>
 
+      {noShift && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-50 px-5 py-4 dark:bg-amber-500/10">
+          <p className="font-medium text-amber-800 dark:text-amber-300">
+            Belum ada shift aktif. Buka shift untuk dapat menerima pembayaran.
+          </p>
+          <Link
+            to="/pos/shift"
+            className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-600 active:scale-[0.98]"
+          >
+            Buka shift
+          </Link>
+        </div>
+      )}
+      
       {canServe && readyCount > 0 && filter !== 'READY' && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-sky-50 px-5 py-4 dark:bg-sky-500/10">
           <p className="font-medium text-sky-800 dark:text-sky-300">{readyCount} pesanan siap disajikan atau diambil</p>
