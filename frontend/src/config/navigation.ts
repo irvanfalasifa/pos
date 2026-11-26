@@ -11,6 +11,8 @@ import {
   ShieldCheck,
   Settings,
   KeyRound,
+  Wallet,
+  Banknote,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { AuthUser } from '../stores/authStore'
@@ -46,6 +48,7 @@ export const workspaces: Workspace[] = [
       { label: 'Produk', path: '/manajemen/produk', icon: Package, permission: 'product.view' },
       { label: 'Inventori', path: '/manajemen/inventori', icon: Boxes, permission: 'product.view' },
       { label: 'Laporan', path: '/manajemen/laporan', icon: TrendingUp, permission: 'report.view' },
+      { label: 'Shift & Kas', path: '/manajemen/shift', icon: Banknote, permission: 'shift.review' },
       { label: 'Pengguna', path: '/manajemen/pengguna', icon: Users, permission: 'user.manage' },
       { label: 'Role & Izin', path: '/manajemen/role', icon: KeyRound, permission: 'role.manage' },
       { label: 'Audit Log', path: '/manajemen/audit', icon: ShieldCheck, permission: 'audit.view' },
@@ -63,6 +66,7 @@ export const workspaces: Workspace[] = [
       { label: 'Kasir', path: '/pos', icon: ShoppingCart, permission: 'order.create', end: true },
       { label: 'Meja', path: '/pos/meja', icon: LayoutGrid, permission: 'order.view' },
       { label: 'Transaksi', path: '/pos/transaksi', icon: Receipt, permission: 'order.view' },
+      { label: 'Shift', path: '/pos/shift', icon: Wallet, permission: 'shift.operate' },
     ],
   },
   {

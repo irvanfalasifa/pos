@@ -80,6 +80,17 @@ orderActionsRouter.post('/orders/:id/cancel', requireAuth, requirePermission('or
         throw new ActionError('Status pesanan sudah berubah, muat ulang halaman', 409)
       }
 
+      // Uang tunai yang harus keluar dari laci memerlukan shift aktif
+      const cashToReturn = sum(
+        order.payments
+          .filter((p) => p.method === 'CASH')
+          .map((p) => Math.max(0, p.amount - sum(p.refunds.map((r) => r.amount)))),
+      )
+      const shift = await tx.shift.findFirst({ where: { userId: user.id, status: 'OPEN' } })
+      if (cashToReturn > 0 && !shift) {
+        throw new ActionError('Buka shift terlebih dahulu untuk mengembalikan uang tunai kepada pelanggan', 403)
+      }
+
       // Pembayaran yang sudah masuk dikembalikan penuh (setelah dikurangi refund sebelumnya)
       let refunded = 0
       for (const p of order.payments) {
@@ -93,6 +104,7 @@ orderActionsRouter.post('/orders/:id/cancel', requireAuth, requirePermission('or
               reason: `Pembatalan pesanan: ${reason}`,
               approvedById: approverId,
               createdById: user.id,
+              shiftId: shift?.id ?? null,
             },
           })
           refunded += remaining
@@ -213,6 +225,16 @@ orderActionsRouter.post('/orders/:id/refunds', requireAuth, requirePermission('p
               total += r.amount
             }
 
+            // Refund tunai mengeluarkan uang dari laci, jadi butuh shift aktif
+            const cashRefund = input.refunds.reduce(
+              (s, r) => (byId.get(r.paymentId)?.method === 'CASH' ? s + r.amount : s),
+              0,
+            )
+            const shift = await tx.shift.findFirst({ where: { userId: user.id, status: 'OPEN' } })
+            if (cashRefund > 0 && !shift) {
+              throw new ActionError('Buka shift terlebih dahulu untuk mengembalikan uang tunai kepada pelanggan', 403)
+            }
+
             await tx.refund.createMany({
               data: input.refunds.map((r) => ({
                 paymentId: r.paymentId,
@@ -221,6 +243,7 @@ orderActionsRouter.post('/orders/:id/refunds', requireAuth, requirePermission('p
                 reason: input.reason,
                 approvedById: approverId,
                 createdById: user.id,
+                shiftId: shift?.id ?? null,
               })),
             })
 

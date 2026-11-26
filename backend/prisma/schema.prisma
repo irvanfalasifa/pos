@@ -25,6 +25,9 @@ model User {
   tokenVersion       Int     @default(0)
   mustChangePassword Boolean @default(false)
   deletedAt DateTime?
+  shifts Shift[] @relation("ShiftCashier")
+  shiftsReviewed Shift[] @relation("ShiftReviewedBy")
+  cashMovements CashMovement[] @relation("CashMovementCreatedBy")
 }
 
 model Role {
@@ -209,6 +212,8 @@ model Order {
   refunds       Refund[]
   cancelReason  String?
   cancelledAt   DateTime?
+  shiftId       Int?
+  shift Shift? @relation(fields: [shiftId], references: [id])
 
   @@index([createdAt])
 }
@@ -262,6 +267,8 @@ model Payment {
   createdBy      User          @relation(fields: [createdById], references: [id])
   createdAt      DateTime      @default(now())
   refunds        Refund[]
+  shiftId        Int?
+  shift Shift? @relation(fields: [shiftId], references: [id])
 
   @@index([orderId])
 }
@@ -292,6 +299,8 @@ model Refund {
   createdById  Int
   createdBy    User     @relation("RefundCreatedBy", fields: [createdById], references: [id])
   createdAt    DateTime @default(now())
+  shiftId      Int?
+  shift Shift? @relation(fields: [shiftId], references: [id])
 
   @@index([orderId])
   @@index([paymentId])
@@ -325,4 +334,54 @@ model LoginEvent {
 
   @@index([email, createdAt])
   @@index([userId])
+}
+
+enum ShiftStatus {
+  OPEN
+  CLOSED
+}
+
+enum CashMovementType {
+  IN
+  OUT
+}
+
+model Shift {
+  id             Int           @id @default(autoincrement())
+  userId         Int
+  user           User          @relation("ShiftCashier", fields: [userId], references: [id])
+  openedAt       DateTime      @default(now())
+  closedAt       DateTime?
+  openingCash    Int
+  expectedCash   Int?
+  closingCash    Int?
+  cashDifference Int?
+  closingNote    String?
+  status         ShiftStatus   @default(OPEN)
+  reviewedById   Int?
+  reviewedBy     User?         @relation("ShiftReviewedBy", fields: [reviewedById], references: [id])
+  reviewedAt     DateTime?
+  reviewNote     String?
+  orders         Order[]
+  payments       Payment[]
+  refunds        Refund[]
+  movements      CashMovement[]
+
+  @@index([userId, status])
+  @@index([openedAt])
+}
+
+model CashMovement {
+  id           Int              @id @default(autoincrement())
+  shiftId      Int
+  shift        Shift            @relation(fields: [shiftId], references: [id])
+  type         CashMovementType
+  amount       Int
+  reason       String
+  approvedById Int?
+  createdById  Int
+  createdBy    User             @relation("CashMovementCreatedBy", fields: [createdById], references: [id])
+  createdAt    DateTime         @default(now())
+
+  @@index([shiftId])
 }

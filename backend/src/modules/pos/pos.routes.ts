@@ -205,6 +205,9 @@ async function createOrder(input: OrderInput, userId: number) {
     roundingStep > 0 ? Math.round(beforeRounding / roundingStep) * roundingStep - beforeRounding : 0
   const total = beforeRounding + roundingAmount
 
+  // Pesanan dari kasir yang punya shift aktif otomatis tertaut ke shift itu
+  const shift = await prisma.shift.findFirst({ where: { userId, status: 'OPEN' }, select: { id: true } })
+
   // 5. Simpan. Nomor pesanan dicoba ulang bila bentrok dengan permintaan lain.
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
@@ -230,6 +233,7 @@ async function createOrder(input: OrderInput, userId: number) {
             taxAmount,
             total,
             roundingAmount,
+            shiftId: shift?.id ?? null,
             createdById: userId,
             items: {
               create: lines.map((l) => ({
@@ -358,6 +362,12 @@ async function payOrder(orderId: number, input: PaymentInput, userId: number) {
     return prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: orderInclude })
   }
 
+  // Setiap pembayaran harus tertaut ke shift kasir yang sedang aktif
+  const shift = await prisma.shift.findFirst({ where: { userId, status: 'OPEN' }, select: { id: true } })
+  if (!shift) {
+    throw new PaymentError('Buka shift terlebih dahulu di menu Shift sebelum menerima pembayaran', 403)
+  }
+  
   for (let attempt = 0; attempt < 4; attempt++) {
     try {
       return await prisma.$transaction(
@@ -393,7 +403,7 @@ async function payOrder(orderId: number, input: PaymentInput, userId: number) {
           })
 
           await tx.payment.createMany({
-            data: rows.map((r) => ({ ...r, orderId, createdById: userId })),
+            data: rows.map((r) => ({ ...r, orderId, createdById: userId, shiftId: shift.id })),
           })
 
                     const fullyPaid = paid + sum >= order.total

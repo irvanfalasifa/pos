@@ -17,6 +17,7 @@ import { auditRouter } from './modules/audit/audit.routes.js'
 import { settingsRouter } from './modules/settings/settings.routes.js'
 import { tablesAdminRouter } from './modules/pos/tablesAdmin.routes.js'
 import { usersRouter } from './modules/users/users.routes.js'
+import { shiftsRouter } from './modules/shifts/shifts.routes.js'
 
 const app = express()
 
@@ -39,6 +40,7 @@ app.use('/api', auditRouter)
 app.use('/api', settingsRouter)
 app.use('/api', tablesAdminRouter)
 app.use('/api', usersRouter)
+app.use('/api', shiftsRouter)
 
 app.get('/api/roles', requireAuth, requirePermission('user.manage'), async (_req, res) => {
   const roles = await prisma.role.findMany({

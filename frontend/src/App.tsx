@@ -19,6 +19,8 @@ import TablesAdminPage from './pages/TablesAdminPage'
 import UsersPage from './pages/UsersPage'
 import RolesPage from './pages/RolesPage'
 import { useToastStore } from './stores/toastStore'
+import ShiftPage from './pages/ShiftPage'
+import ShiftsAdminPage from './pages/ShiftsAdminPage'
 
 export default function App() {
   const fetchMe = useAuthStore((s) => s.fetchMe)
@@ -138,6 +140,14 @@ export default function App() {
             element={
               <RequirePermission code="order.view">
                 <OrdersPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/pos/shift"
+            element={
+              <RequirePermission code="shift.operate">
+                <ShiftPage />
               </RequirePermission>
             }
           />
