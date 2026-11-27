@@ -5,6 +5,7 @@ import { requireAuth, requirePermission } from '../../middleware/auth.js'
 import type { AuthUser } from '../../middleware/auth.js'
 import { ApprovalError, auditData, authorize } from '../audit/audit.service.js'
 import { emitOrdersChanged, emitTablesChanged } from '../../realtime/socket.js'
+import { restoreForOrder } from '../inventory/stock.service.js'
 
 export const orderActionsRouter = Router()
 
@@ -40,6 +41,7 @@ const sum = (values: number[]) => values.reduce((s, v) => s + v, 0)
 const cancelSchema = z.object({
   reason: z.string().trim().min(3).max(200),
   approver: approverSchema,
+  stockOutcome: z.enum(['RETURN', 'WASTE']).optional(),
 })
 
 const CANCELLABLE: readonly string[] = ['PLACED', 'CONFIRMED', 'PREPARING', 'READY']
@@ -50,7 +52,7 @@ orderActionsRouter.post('/orders/:id/cancel', requireAuth, requirePermission('or
 
   const parsed = cancelSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ message: 'Alasan pembatalan wajib diisi (minimal 3 huruf)' })
-  const { reason, approver } = parsed.data
+  const { reason, approver, stockOutcome } = parsed.data
 
   const user = res.locals.user as AuthUser
 
@@ -66,6 +68,11 @@ orderActionsRouter.post('/orders/:id/cancel', requireAuth, requirePermission('or
       throw new ActionError('Pesanan yang sudah disajikan tidak bisa dibatalkan. Gunakan refund bila diperlukan.')
     }
 
+    // Bila bahan sudah dikurangi, wajib dijelaskan nasibnya
+    if (order.stockDeductedAt && !stockOutcome) {
+      throw new ActionError('Pilih apakah bahan dikembalikan ke stok atau dicatat sebagai waste')
+    }
+    
     const approverId = await authorize(user, 'order.cancel', approver, `cancel:${order.number}`)
 
     const grossPaid = sum(order.payments.map((p) => p.amount))
@@ -78,6 +85,10 @@ orderActionsRouter.post('/orders/:id/cancel', requireAuth, requirePermission('or
       })
       if (changed.count === 0) {
         throw new ActionError('Status pesanan sudah berubah, muat ulang halaman', 409)
+      }
+      
+      if (order.stockDeductedAt) {
+        await restoreForOrder(tx, id, user.id, stockOutcome ?? 'WASTE', `Pembatalan pesanan ${order.number}: ${reason}`)
       }
 
       // Uang tunai yang harus keluar dari laci memerlukan shift aktif

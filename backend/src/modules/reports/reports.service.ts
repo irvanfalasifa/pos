@@ -380,7 +380,7 @@ export async function buildStaff(range: Range) {
 }
 
 export async function buildLive() {
-  const [activeOrders, unpaidOrders, tableGroups, openShifts, pendingReviews] = await Promise.all([
+    const [activeOrders, unpaidOrders, tableGroups, openShifts, pendingReviews, stockRows] = await Promise.all([
     prisma.order.count({ where: { status: { in: ['PLACED', 'CONFIRMED', 'PREPARING', 'READY'] } } }),
     prisma.order.count({
       where: { status: { not: 'CANCELLED' }, paymentStatus: { in: ['UNPAID', 'PARTIALLY_PAID'] } },
@@ -395,6 +395,10 @@ export async function buildLive() {
       select: { id: true, openedAt: true, user: { select: { name: true } } },
     }),
     prisma.shift.count({ where: { status: 'CLOSED', reviewedAt: null, cashDifference: { not: 0 } } }),
+    prisma.ingredient.findMany({
+      where: { isActive: true, minimumStock: { gt: 0 } },
+      select: { currentStock: true, minimumStock: true },
+    }),
   ])
 
   const tables = { AVAILABLE: 0, OCCUPIED: 0, RESERVED: 0, CLEANING: 0 }
@@ -406,5 +410,6 @@ export async function buildLive() {
     tables,
     openShifts: openShifts.map((s) => ({ id: s.id, openedAt: s.openedAt, cashier: s.user.name })),
     pendingReviews,
+    lowStock: stockRows.filter((i) => i.currentStock <= i.minimumStock).length,
   }
 }

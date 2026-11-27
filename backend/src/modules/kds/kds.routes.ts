@@ -4,6 +4,7 @@ import { prisma } from '../../lib/prisma.js'
 import { requireAuth, requirePermission } from '../../middleware/auth.js'
 import type { AuthUser } from '../../middleware/auth.js'
 import { emitOrdersChanged } from '../../realtime/socket.js'
+import { StockError, deductForOrder, restoreForOrder } from '../inventory/stock.service.js'
 
 export const kdsRouter = Router()
 
@@ -97,19 +98,36 @@ kdsRouter.patch('/orders/:id/status', requireAuth, async (req, res) => {
   // Pesanan yang sudah disajikan dan sudah lunas langsung selesai
   const nextStatus = rule.to === 'SERVED' && order.paymentStatus === 'PAID' ? 'COMPLETED' : rule.to
 
-  const changed = await prisma.$transaction(async (tx) => {
-    // Hanya berubah jika status belum diubah orang lain di saat yang sama
-    const result = await tx.order.updateMany({
-      where: { id, status: order.status },
-      data: { status: nextStatus },
-    })
-    if (result.count === 0) return false
+  let changed: boolean
+  try {
+    changed = await prisma.$transaction(async (tx) => {
+      // Hanya berubah jika status belum diubah orang lain di saat yang sama
+      const result = await tx.order.updateMany({
+        where: { id, status: order.status },
+        data: { status: nextStatus },
+      })
+      if (result.count === 0) return false
 
-    await tx.orderStatusLog.create({
-      data: { orderId: id, fromStatus: order.status, toStatus: nextStatus, userId: user.id },
+      await tx.orderStatusLog.create({
+        data: { orderId: id, fromStatus: order.status, toStatus: nextStatus, userId: user.id },
+      })
+
+      // Bahan baku berkurang saat dapur mulai menyiapkan pesanan
+      if (rule.to === 'PREPARING' && (order.status === 'PLACED' || order.status === 'CONFIRMED')) {
+        await deductForOrder(tx, id, user.id)
+      }
+
+      // Dikembalikan ke antrean baru: bahan belum dipakai, kembalikan ke stok
+      if (rule.from === 'PREPARING' && rule.to === 'PLACED') {
+        await restoreForOrder(tx, id, user.id, 'RETURN', 'Dikembalikan ke antrean baru')
+      }
+
+      return true
     })
-    return true
-  })
+  } catch (e) {
+    if (e instanceof StockError) return res.status(e.status).json({ message: e.message, code: e.code })
+    throw e
+  }
 
   if (!changed) {
     return res.status(409).json({ message: 'Status pesanan sudah diubah orang lain, data dimuat ulang' })

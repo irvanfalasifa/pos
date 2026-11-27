@@ -28,6 +28,7 @@ model User {
   shifts Shift[] @relation("ShiftCashier")
   shiftsReviewed Shift[] @relation("ShiftReviewedBy")
   cashMovements CashMovement[] @relation("CashMovementCreatedBy")
+  stockMovements StockMovement[] @relation("StockMovementCreatedBy")
 }
 
 model Role {
@@ -85,6 +86,7 @@ model Product {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   orderItems  OrderItem[]
+  recipes     Recipe[]
 }
 
 model ProductVariant {
@@ -95,6 +97,7 @@ model ProductVariant {
   isActive   Boolean @default(true)
   product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   orderItems  OrderItem[]
+  recipes    Recipe[]
 }
 
 model ModifierGroup {
@@ -115,6 +118,7 @@ model Modifier {
   isActive Boolean       @default(true)
   group    ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   orderItemModifiers  OrderItemModifier[]
+  ingredients ModifierIngredient[]
 }
 
 model ProductModifierGroup {
@@ -214,6 +218,7 @@ model Order {
   cancelledAt   DateTime?
   shiftId       Int?
   shift Shift? @relation(fields: [shiftId], references: [id])
+  stockDeductedAt DateTime?
 
   @@index([createdAt])
 }
@@ -384,4 +389,86 @@ model CashMovement {
   createdAt    DateTime         @default(now())
 
   @@index([shiftId])
+}
+
+enum StockMovementType {
+  OPENING
+  PURCHASE_IN
+  MANUAL_IN
+  MANUAL_OUT
+  ADJUSTMENT
+  WASTE
+  SALE_USAGE
+  SALE_RETURN
+}
+
+model Ingredient {
+  id             Int       @id @default(autoincrement())
+  name           String    @unique
+  sku            String?   @unique
+  unit           String
+  purchaseUnit   String?
+  purchaseFactor Int?
+  currentStock   Int       @default(0)
+  minimumStock   Int       @default(0)
+  averageCost    Float     @default(0)
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  recipeItems    RecipeItem[]
+  modifierUsages ModifierIngredient[]
+  movements      StockMovement[]
+}
+
+model Recipe {
+  id            Int          @id @default(autoincrement())
+  productId     Int
+  product       Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId     Int?
+  variant       ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  yieldQuantity Int          @default(1)
+  isActive      Boolean      @default(true)
+  items         RecipeItem[]
+
+  @@index([productId])
+}
+
+model RecipeItem {
+  id           Int        @id @default(autoincrement())
+  recipeId     Int
+  recipe       Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredientId Int
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+  quantity     Int
+}
+
+model ModifierIngredient {
+  id           Int        @id @default(autoincrement())
+  modifierId   Int
+  modifier     Modifier   @relation(fields: [modifierId], references: [id], onDelete: Cascade)
+  ingredientId Int
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+  quantity     Int
+
+  @@unique([modifierId, ingredientId])
+}
+
+model StockMovement {
+  id            Int               @id @default(autoincrement())
+  ingredientId  Int
+  ingredient    Ingredient        @relation(fields: [ingredientId], references: [id])
+  type          StockMovementType
+  quantityIn    Int               @default(0)
+  quantityOut   Int               @default(0)
+  unitCost      Float?
+  balanceAfter  Int
+  referenceType String?
+  referenceId   Int?
+  reason        String?
+  createdById   Int
+  createdBy     User              @relation("StockMovementCreatedBy", fields: [createdById], references: [id])
+  createdAt     DateTime          @default(now())
+
+  @@index([ingredientId, createdAt])
+  @@index([referenceType, referenceId])
 }
