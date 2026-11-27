@@ -21,6 +21,7 @@ import RolesPage from './pages/RolesPage'
 import { useToastStore } from './stores/toastStore'
 import ShiftPage from './pages/ShiftPage'
 import ShiftsAdminPage from './pages/ShiftsAdminPage'
+import ReportsPage from './pages/ReportsPage'
 
 export default function App() {
   const fetchMe = useAuthStore((s) => s.fetchMe)
@@ -69,7 +70,7 @@ export default function App() {
             path="/manajemen/laporan"
             element={
               <RequirePermission code="report.view">
-                <PlaceholderPage title="Laporan" description="Laporan penjualan dan analitik." />
+                <ReportsPage />
               </RequirePermission>
             }
           />
